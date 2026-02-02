@@ -10,11 +10,11 @@ bucket_name = "epstein-documents"
 [[d1_databases]]
 binding = "CACHE_DB"
 database_name = "epstein-cache"
-database_id = ""
+database_id = "ea7bdcb5-d8f4-4d6c-8ac4-e9dc3c3075c4"
 
 [[kv_namespaces]]
 binding = "SESSIONS"
-id = ""
+id = "eea15de47a4e454ca1079e6a218d26fe"
 
 [ai]
 binding = "AI"

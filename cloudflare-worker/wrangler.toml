@@ -1,0 +1,24 @@
+name = "epstein-api"
+main = "src/index.ts"
+compatibility_date = "2025-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+[[r2_buckets]]
+binding = "DOCUMENTS"
+bucket_name = "epstein-documents"
+
+[[d1_databases]]
+binding = "CACHE_DB"
+database_name = "epstein-cache"
+database_id = ""
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = ""
+
+[ai]
+binding = "AI"
+
+[vars]
+ENVIRONMENT = "production"
+ORIGIN_URL = "https://api.epsteinfiles.org"

@@ -1,0 +1,13 @@
+.env
+*.pem
+*.key
+data/
+backups/
+logs/
+config/cloudflared/*.json
+node_modules/
+__pycache__/
+.DS_Store
+*.tmp
+*.log
+firebase-debug.log

@@ -24,6 +24,4 @@ id = "internal-gateway"
 
 [vars]
 ENVIRONMENT = "production"
-# Note: Tunnel ingress rules need to be configured in Cloudflare Zero Trust dashboard
-# for this hostname to work. The tunnel ID is 36bf2f62-b936-47d1-88ad-6db3c70ff2b1
-ORIGIN_URL = "https://api.epsteinfiles.org.allfrontoffice.com"
+ORIGIN_URL = "https://epstein-api.allfrontoffice.com"

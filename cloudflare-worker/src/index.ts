@@ -9,6 +9,7 @@ type Bindings = {
   SESSIONS: KVNamespace;
   AI: Ai;
   API_SECRET_KEY: string;
+  AI_GATEWAY_TOKEN: string;
   ORIGIN_URL: string;
   ENVIRONMENT: string;
 };
@@ -119,9 +120,19 @@ app.post('/search', async (c) => {
     }
 
     // Generate embedding using Workers AI (BGE-base for document search)
-    const embeddingResponse = await c.env.AI.run('@cf/baai/bge-base-en-v1.5', {
-      text: [query],
-    }) as { data: number[][] };
+    // AI Gateway authentication is required for Zero Trust access
+    const embeddingResponse = await c.env.AI.run(
+      '@cf/baai/bge-base-en-v1.5',
+      { text: [query] },
+      {
+        gateway: {
+          id: 'internal-gateway',
+          headers: {
+            'cf-aig-authorization': `Bearer ${c.env.AI_GATEWAY_TOKEN}`,
+          },
+        },
+      }
+    ) as { data: number[][] };
 
     if (!embeddingResponse?.data?.[0]) {
       return c.json({ error: 'Failed to generate embedding' }, 500);

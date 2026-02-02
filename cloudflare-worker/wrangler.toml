@@ -19,6 +19,9 @@ id = "eea15de47a4e454ca1079e6a218d26fe"
 [ai]
 binding = "AI"
 
+[ai.gateway]
+id = "internal-gateway"
+
 [vars]
 ENVIRONMENT = "production"
 # Note: Tunnel ingress rules need to be configured in Cloudflare Zero Trust dashboard

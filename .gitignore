@@ -11,3 +11,4 @@ __pycache__/
 *.tmp
 *.log
 firebase-debug.log
+openclaw/env-additions.txt

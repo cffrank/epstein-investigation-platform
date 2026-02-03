@@ -8,11 +8,31 @@ type Bindings = {
   CACHE_DB: D1Database;
   SESSIONS: KVNamespace;
   AI: Ai;
+  DOCUMENT_QUEUE: Queue<DocumentMessage>;
+  DLQ: Queue<DocumentMessage>;
+  DOCUMENT_WORKFLOW: Workflow;
+  BATCH_WORKFLOW: Workflow;
   API_SECRET_KEY: string;
   AI_GATEWAY_TOKEN: string;
   ORIGIN_URL: string;
   ENVIRONMENT: string;
 };
+
+// Workflow type placeholder
+interface Workflow {
+  create(params: { params: unknown }): Promise<{ id: string }>;
+  get(id: string): Promise<{ status: string; output?: unknown }>;
+}
+
+// Queue message types
+interface DocumentMessage {
+  type: 'process_document' | 'generate_embedding' | 'extract_entities';
+  documentId: string;
+  r2Key?: string;
+  text?: string;
+  metadata?: Record<string, unknown>;
+  attempt?: number;
+}
 
 type Variables = {
   requestId: string;
@@ -291,6 +311,133 @@ app.post('/graph/query', async (c) => {
   }
 });
 
+// Text generation endpoint for entity extraction
+app.post('/ai/generate', async (c) => {
+  try {
+    // Verify API key for internal use
+    const apiKey = c.req.header('X-API-Key');
+    if (apiKey !== c.env.API_SECRET_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const body = await c.req.json();
+    const { prompt, system, max_tokens = 2048 } = body;
+
+    if (!prompt || typeof prompt !== 'string') {
+      return c.json({ error: 'Prompt string required' }, 400);
+    }
+
+    // Use Llama 3 for entity extraction
+    const response = await c.env.AI.run(
+      '@cf/meta/llama-3-8b-instruct',
+      {
+        messages: [
+          { role: 'system', content: system || 'You are a helpful assistant.' },
+          { role: 'user', content: prompt }
+        ],
+        max_tokens,
+      },
+      {
+        gateway: {
+          id: 'internal-gateway',
+          headers: {
+            'cf-aig-authorization': `Bearer ${c.env.AI_GATEWAY_TOKEN}`,
+          },
+        },
+      }
+    ) as { response: string };
+
+    return c.json({
+      text: response.response,
+      model: '@cf/meta/llama-3-8b-instruct',
+    });
+  } catch (error) {
+    console.error('Text generation error:', error);
+    return c.json({ error: 'Text generation failed' }, 500);
+  }
+});
+
+// Embedding generation endpoint for document processing
+app.post('/ai/embedding', async (c) => {
+  try {
+    // Verify API key for internal use
+    const apiKey = c.req.header('X-API-Key');
+    if (apiKey !== c.env.API_SECRET_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const body = await c.req.json();
+    const { text } = body;
+
+    if (!text || typeof text !== 'string') {
+      return c.json({ error: 'Text string required' }, 400);
+    }
+
+    // Generate embedding using Workers AI (BGE-base)
+    const embeddingResponse = await c.env.AI.run(
+      '@cf/baai/bge-base-en-v1.5',
+      { text: [text.slice(0, 8000)] }, // Limit text length
+      {
+        gateway: {
+          id: 'internal-gateway',
+          headers: {
+            'cf-aig-authorization': `Bearer ${c.env.AI_GATEWAY_TOKEN}`,
+          },
+        },
+      }
+    ) as { data: number[][] };
+
+    if (!embeddingResponse?.data?.[0]) {
+      return c.json({ error: 'Failed to generate embedding' }, 500);
+    }
+
+    return c.json({
+      embedding: embeddingResponse.data[0],
+      dimensions: embeddingResponse.data[0].length,
+      model: '@cf/baai/bge-base-en-v1.5',
+    });
+  } catch (error) {
+    console.error('Embedding generation error:', error);
+    return c.json({ error: 'Embedding generation failed' }, 500);
+  }
+});
+
+// Document upload to R2 (internal use only)
+app.put('/documents/:key{.+}', async (c) => {
+  try {
+    // Verify API key for internal use
+    const apiKey = c.req.header('X-API-Key');
+    if (apiKey !== c.env.API_SECRET_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const key = c.req.param('key');
+    const contentType = c.req.header('Content-Type') || 'application/pdf';
+    const body = await c.req.arrayBuffer();
+
+    if (!body || body.byteLength === 0) {
+      return c.json({ error: 'Empty body' }, 400);
+    }
+
+    // Upload to R2
+    await c.env.DOCUMENTS.put(key, body, {
+      httpMetadata: {
+        contentType,
+      },
+    });
+
+    return c.json({
+      success: true,
+      key,
+      size: body.byteLength,
+      requestId: c.get('requestId'),
+    });
+  } catch (error) {
+    console.error('Document upload error:', error);
+    return c.json({ error: 'Upload failed' }, 500);
+  }
+});
+
 // Face search endpoint
 app.post('/faces/search', async (c) => {
   try {
@@ -321,6 +468,229 @@ app.post('/faces/search', async (c) => {
   }
 });
 
+// Queue document for processing (batch enqueue)
+app.post('/queue/documents', async (c) => {
+  try {
+    const apiKey = c.req.header('X-API-Key');
+    if (apiKey !== c.env.API_SECRET_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const body = await c.req.json();
+    const { documents } = body as { documents: Array<{ id: string; r2Key: string; metadata?: Record<string, unknown> }> };
+
+    if (!documents || !Array.isArray(documents)) {
+      return c.json({ error: 'documents array required' }, 400);
+    }
+
+    // Batch enqueue - up to 100 messages per batch
+    const messages: MessageSendRequest<DocumentMessage>[] = documents.map(doc => ({
+      body: {
+        type: 'process_document' as const,
+        documentId: doc.id,
+        r2Key: doc.r2Key,
+        metadata: doc.metadata,
+        attempt: 1,
+      },
+    }));
+
+    // Send in batches of 100
+    for (let i = 0; i < messages.length; i += 100) {
+      const batch = messages.slice(i, i + 100);
+      await c.env.DOCUMENT_QUEUE.sendBatch(batch);
+    }
+
+    return c.json({
+      success: true,
+      queued: documents.length,
+      requestId: c.get('requestId'),
+    });
+  } catch (error) {
+    console.error('Queue enqueue error:', error);
+    return c.json({ error: 'Failed to enqueue documents' }, 500);
+  }
+});
+
+// Scan and queue unprocessed documents
+app.post('/queue/scan-unprocessed', async (c) => {
+  try {
+    const apiKey = c.req.header('X-API-Key');
+    if (apiKey !== c.env.API_SECRET_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const body = await c.req.json().catch(() => ({}));
+    const { limit = 100, source } = body as { limit?: number; source?: string };
+    const safeLimit = Math.min(limit, 500);
+
+    // Get unprocessed documents from origin API
+    const url = new URL(`${c.env.ORIGIN_URL}/api/documents/unprocessed`);
+    url.searchParams.set('limit', safeLimit.toString());
+    if (source) url.searchParams.set('source', source);
+
+    const response = await fetch(url.toString(), {
+      headers: { 'X-API-Key': c.env.API_SECRET_KEY },
+    });
+
+    if (!response.ok) {
+      return c.json({ error: 'Failed to get unprocessed documents' }, 502);
+    }
+
+    const { documents } = await response.json() as { documents: Array<{ documentId: string; r2Key: string; source: string }> };
+
+    if (!documents || documents.length === 0) {
+      return c.json({ message: 'No unprocessed documents found', queued: 0 });
+    }
+
+    // Queue for processing
+    const messages: MessageSendRequest<DocumentMessage>[] = documents.map(doc => ({
+      body: {
+        type: 'process_document' as const,
+        documentId: doc.documentId,
+        r2Key: doc.r2Key,
+        metadata: { source: doc.source },
+        attempt: 1,
+      },
+    }));
+
+    // Send in batches of 100
+    for (let i = 0; i < messages.length; i += 100) {
+      const batch = messages.slice(i, i + 100);
+      await c.env.DOCUMENT_QUEUE.sendBatch(batch);
+    }
+
+    return c.json({
+      success: true,
+      queued: documents.length,
+      source: source || 'all',
+      requestId: c.get('requestId'),
+    });
+  } catch (error) {
+    console.error('Scan unprocessed error:', error);
+    return c.json({ error: 'Failed to scan and queue' }, 500);
+  }
+});
+
+// Queue status endpoint
+app.get('/queue/status', async (c) => {
+  try {
+    const apiKey = c.req.header('X-API-Key');
+    if (apiKey !== c.env.API_SECRET_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    // Check processing stats from D1
+    const stats = await c.env.CACHE_DB.prepare(`
+      SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+        SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) as processing,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
+      FROM processing_jobs
+    `).first();
+
+    return c.json({
+      stats: stats || { total: 0, pending: 0, processing: 0, completed: 0, failed: 0 },
+      requestId: c.get('requestId'),
+    });
+  } catch (error) {
+    console.error('Queue status error:', error);
+    return c.json({ error: 'Failed to get queue status' }, 500);
+  }
+});
+
+// Trigger workflow for single document
+app.post('/workflow/document', async (c) => {
+  try {
+    const apiKey = c.req.header('X-API-Key');
+    if (apiKey !== c.env.API_SECRET_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const body = await c.req.json();
+    const { documentId, r2Key, source, metadata } = body as {
+      documentId: string;
+      r2Key: string;
+      source: string;
+      metadata?: Record<string, unknown>;
+    };
+
+    if (!documentId || !r2Key) {
+      return c.json({ error: 'documentId and r2Key required' }, 400);
+    }
+
+    const instance = await c.env.DOCUMENT_WORKFLOW.create({
+      params: { documentId, r2Key, source, metadata },
+    });
+
+    return c.json({
+      workflowId: instance.id,
+      status: 'started',
+      requestId: c.get('requestId'),
+    });
+  } catch (error) {
+    console.error('Workflow trigger error:', error);
+    return c.json({ error: 'Failed to start workflow' }, 500);
+  }
+});
+
+// Trigger batch workflow for multiple documents
+app.post('/workflow/batch', async (c) => {
+  try {
+    const apiKey = c.req.header('X-API-Key');
+    if (apiKey !== c.env.API_SECRET_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const body = await c.req.json();
+    const { documents } = body as {
+      documents: Array<{ documentId: string; r2Key: string; source: string }>;
+    };
+
+    if (!documents || !Array.isArray(documents)) {
+      return c.json({ error: 'documents array required' }, 400);
+    }
+
+    const instance = await c.env.BATCH_WORKFLOW.create({
+      params: { documents },
+    });
+
+    return c.json({
+      workflowId: instance.id,
+      documentsCount: documents.length,
+      status: 'started',
+      requestId: c.get('requestId'),
+    });
+  } catch (error) {
+    console.error('Batch workflow trigger error:', error);
+    return c.json({ error: 'Failed to start batch workflow' }, 500);
+  }
+});
+
+// Get workflow status
+app.get('/workflow/:id', async (c) => {
+  try {
+    const apiKey = c.req.header('X-API-Key');
+    if (apiKey !== c.env.API_SECRET_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const workflowId = c.req.param('id');
+    const instance = await c.env.DOCUMENT_WORKFLOW.get(workflowId);
+
+    return c.json({
+      workflowId,
+      status: instance.status,
+      output: instance.output,
+      requestId: c.get('requestId'),
+    });
+  } catch (error) {
+    console.error('Workflow status error:', error);
+    return c.json({ error: 'Failed to get workflow status' }, 500);
+  }
+});
+
 // 404 handler
 app.notFound((c) => {
   return c.json({
@@ -348,4 +718,168 @@ async function hashString(str: string): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-export default app;
+// Queue consumer handler
+async function processQueueBatch(
+  batch: MessageBatch<DocumentMessage>,
+  env: Bindings
+): Promise<void> {
+  for (const message of batch.messages) {
+    try {
+      const { type, documentId, r2Key, text, metadata } = message.body;
+
+      switch (type) {
+        case 'process_document': {
+          if (!r2Key) {
+            message.ack();
+            continue;
+          }
+
+          // Get document from R2
+          const object = await env.DOCUMENTS.get(r2Key);
+          if (!object) {
+            console.error(`Document not found in R2: ${r2Key}`);
+            message.ack();
+            continue;
+          }
+
+          // For PDFs, send to origin for text extraction
+          const extractResponse = await fetch(`${env.ORIGIN_URL}/api/extract`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-API-Key': env.API_SECRET_KEY,
+            },
+            body: JSON.stringify({ r2Key, documentId }),
+          });
+
+          if (!extractResponse.ok) {
+            message.retry();
+            continue;
+          }
+
+          const { text: extractedText } = await extractResponse.json() as { text: string };
+
+          // Queue embedding generation
+          await env.DOCUMENT_QUEUE.send({
+            type: 'generate_embedding',
+            documentId,
+            text: extractedText.slice(0, 8000),
+            metadata,
+          });
+
+          message.ack();
+          break;
+        }
+
+        case 'generate_embedding': {
+          if (!text) {
+            message.ack();
+            continue;
+          }
+
+          // Generate embedding using Workers AI
+          const embeddingResponse = await env.AI.run(
+            '@cf/baai/bge-base-en-v1.5',
+            { text: [text] },
+            {
+              gateway: {
+                id: 'internal-gateway',
+                headers: {
+                  'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
+                },
+              },
+            }
+          ) as { data: number[][] };
+
+          if (!embeddingResponse?.data?.[0]) {
+            message.retry();
+            continue;
+          }
+
+          // Store embedding via origin
+          const storeResponse = await fetch(`${env.ORIGIN_URL}/api/embeddings`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-API-Key': env.API_SECRET_KEY,
+            },
+            body: JSON.stringify({
+              documentId,
+              embedding: embeddingResponse.data[0],
+              metadata,
+            }),
+          });
+
+          if (!storeResponse.ok) {
+            message.retry();
+            continue;
+          }
+
+          message.ack();
+          break;
+        }
+
+        case 'extract_entities': {
+          if (!text) {
+            message.ack();
+            continue;
+          }
+
+          // Use Llama for entity extraction
+          const entityResponse = await env.AI.run(
+            '@cf/meta/llama-3-8b-instruct',
+            {
+              messages: [
+                {
+                  role: 'system',
+                  content: 'Extract named entities (people, organizations, locations, dates) from the text. Return JSON: {"people":[],"organizations":[],"locations":[],"dates":[]}',
+                },
+                { role: 'user', content: text.slice(0, 4000) },
+              ],
+              max_tokens: 1024,
+            },
+            {
+              gateway: {
+                id: 'internal-gateway',
+                headers: {
+                  'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
+                },
+              },
+            }
+          ) as { response: string };
+
+          // Store entities via origin
+          await fetch(`${env.ORIGIN_URL}/api/entities/batch`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-API-Key': env.API_SECRET_KEY,
+            },
+            body: JSON.stringify({
+              documentId,
+              entities: entityResponse.response,
+              metadata,
+            }),
+          });
+
+          message.ack();
+          break;
+        }
+
+        default:
+          message.ack();
+      }
+    } catch (error) {
+      console.error('Queue processing error:', error);
+      message.retry();
+    }
+  }
+}
+
+// Re-export workflow classes
+export { DocumentProcessingWorkflow, BatchProcessingWorkflow } from './workflow';
+
+export default {
+  fetch: app.fetch,
+  queue: processQueueBatch,
+};

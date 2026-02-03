@@ -1,0 +1,22 @@
+{
+  "name": "epstein-documents",
+  "version": "1.0.0",
+  "description": "MCP server for searching Epstein investigation documents",
+  "main": "index.js",
+  "bin": {
+    "epstein-documents": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["mcp", "epstein", "investigation"],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.3",
+    "dotenv": "^17.2.3",
+    "pg": "^8.18.0"
+  }
+}

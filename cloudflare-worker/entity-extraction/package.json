@@ -1,0 +1,14 @@
+{
+  "name": "entity-extraction",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node extract.js",
+    "status": "node status.js"
+  },
+  "dependencies": {
+    "pg": "^8.11.0",
+    "neo4j-driver": "^5.17.0",
+    "compromise": "^14.10.0"
+  }
+}

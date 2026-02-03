@@ -12,3 +12,12 @@ __pycache__/
 *.log
 firebase-debug.log
 openclaw/env-additions.txt
+
+# Wrangler local state
+.wrangler/
+
+# Playwright MCP state
+.playwright-mcp/
+
+# Empty/temp files
+cloudflare-worker/summary

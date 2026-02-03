@@ -25,3 +25,36 @@ id = "internal-gateway"
 [vars]
 ENVIRONMENT = "production"
 ORIGIN_URL = "https://epstein-api.allfrontoffice.com"
+
+# Document processing queue
+[[queues.producers]]
+binding = "DOCUMENT_QUEUE"
+queue = "epstein-document-processing"
+
+[[queues.consumers]]
+queue = "epstein-document-processing"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "epstein-processing-dlq"
+
+# Dead letter queue for failed jobs
+[[queues.producers]]
+binding = "DLQ"
+queue = "epstein-processing-dlq"
+
+[[queues.consumers]]
+queue = "epstein-processing-dlq"
+max_batch_size = 1
+max_retries = 0
+
+# Workflows for document processing
+[[workflows]]
+binding = "DOCUMENT_WORKFLOW"
+name = "document-processing"
+class_name = "DocumentProcessingWorkflow"
+
+[[workflows]]
+binding = "BATCH_WORKFLOW"
+name = "batch-processing"
+class_name = "BatchProcessingWorkflow"

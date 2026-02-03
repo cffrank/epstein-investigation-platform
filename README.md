@@ -50,3 +50,19 @@ docker compose up -d
 | Workers | $5 |
 | R2 (500GB) | $7.50 |
 | Workers AI | ~$10 |
+
+## Server Access
+
+**Hetzner AX42 Server:**
+- Public IP: `88.99.61.233`
+- SSH: `ssh root@88.99.61.233`
+- Location: FSN1-DC1 (Falkenstein, Germany)
+
+**Cloudflare Zero Trust:**
+- Organization: `allfrontoffice`
+- Internal IP (via WARP): `192.168.1.100` (requires WARP split tunnel config)
+
+**Services:**
+- App: https://app.epsteinfiles.org
+- API: https://api.epsteinfiles.org
+- Admin: https://admin.epsteinfiles.org

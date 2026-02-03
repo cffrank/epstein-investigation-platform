@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "epstein-documents": {
+      "command": "node",
+      "args": ["/home/carl/project/Epstein/cloudflare-worker/mcp-servers/epstein-documents/index.js"],
+      "env": {
+        "PG_HOST": "88.99.61.233",
+        "PG_PORT": "5432",
+        "PG_DATABASE": "platform",
+        "PG_USER": "investigation",
+        "PG_PASSWORD": "kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF"
+      }
+    },
+    "epstein-intelligence": {
+      "command": "node",
+      "args": ["/home/carl/project/Epstein/cloudflare-worker/mcp-servers/epstein-intelligence/index.js"],
+      "env": {
+        "PG_HOST": "88.99.61.233",
+        "PG_PORT": "5432",
+        "PG_DATABASE": "platform",
+        "PG_USER": "investigation",
+        "PG_PASSWORD": "kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF"
+      }
+    }
+  }
+}

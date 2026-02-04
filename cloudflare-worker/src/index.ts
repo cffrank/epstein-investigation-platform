@@ -402,6 +402,55 @@ app.post('/ai/embedding', async (c) => {
   }
 });
 
+// Batch embeddings endpoint for higher throughput
+app.post('/ai/embeddings-batch', async (c) => {
+  try {
+    const apiKey = c.req.header('X-API-Key');
+    if (apiKey !== c.env.API_SECRET_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const body = await c.req.json();
+    const { texts } = body as { texts: string[] };
+
+    if (!texts || !Array.isArray(texts) || texts.length === 0) {
+      return c.json({ error: 'texts array required' }, 400);
+    }
+
+    // Limit batch size to 100
+    const safeBatch = texts.slice(0, 100).map(t =>
+      typeof t === 'string' ? t.slice(0, 8000) : ''
+    );
+
+    // Generate embeddings for all texts at once
+    const embeddingResponse = await c.env.AI.run(
+      '@cf/baai/bge-base-en-v1.5',
+      { text: safeBatch },
+      {
+        gateway: {
+          id: 'internal-gateway',
+          headers: {
+            'cf-aig-authorization': `Bearer ${c.env.AI_GATEWAY_TOKEN}`,
+          },
+        },
+      }
+    ) as { data: number[][] };
+
+    if (!embeddingResponse?.data) {
+      return c.json({ error: 'Failed to generate embeddings' }, 500);
+    }
+
+    return c.json({
+      embeddings: embeddingResponse.data,
+      count: embeddingResponse.data.length,
+      dimensions: embeddingResponse.data[0]?.length || 0,
+    });
+  } catch (error) {
+    console.error('Batch embedding error:', error);
+    return c.json({ error: 'Batch embedding failed' }, 500);
+  }
+});
+
 // Document upload to R2 (internal use only)
 app.put('/documents/:key{.+}', async (c) => {
   try {
@@ -520,8 +569,8 @@ app.post('/process/batch', async (c) => {
     }
 
     const body = await c.req.json().catch(() => ({}));
-    const { limit = 10 } = body as { limit?: number };
-    const safeLimit = Math.min(limit, 50);
+    const { limit = 50 } = body as { limit?: number };
+    const safeLimit = Math.min(limit, 200);
 
     // Get unprocessed documents
     const url = new URL(`${c.env.ORIGIN_URL}/api/documents/unprocessed`);
@@ -1123,13 +1172,183 @@ export { DocumentProcessingWorkflow, BatchProcessingWorkflow } from './workflow'
 export default {
   fetch: app.fetch,
   async queue(batch: MessageBatch<DocumentMessage>, env: Bindings): Promise<void> {
-    console.log(`QUEUE HANDLER: Received ${batch.messages.length} messages`);
+    console.log(`QUEUE HANDLER: Processing ${batch.messages.length} messages`);
+
     for (const message of batch.messages) {
+      const { type, documentId, r2Key, text, metadata } = message.body;
+
       try {
-        console.log(`Processing: ${JSON.stringify(message.body).slice(0, 100)}`);
-        message.ack();
-      } catch (e) {
-        console.error('Message error:', e);
+        switch (type) {
+          case 'process_document': {
+            if (!r2Key) {
+              message.ack();
+              continue;
+            }
+
+            // Get document from R2
+            const object = await env.DOCUMENTS.get(r2Key);
+            if (!object) {
+              console.error(`Document not found in R2: ${r2Key}`);
+              message.ack();
+              continue;
+            }
+
+            const pdfArrayBuffer = await object.arrayBuffer();
+            if (pdfArrayBuffer.byteLength > 10 * 1024 * 1024) {
+              console.log(`Skipping large file: ${r2Key}`);
+              message.ack();
+              continue;
+            }
+
+            // Convert to base64
+            const pdfBytes = new Uint8Array(pdfArrayBuffer);
+            let pdfBinary = '';
+            const chunkSize = 32768;
+            for (let i = 0; i < pdfBytes.length; i += chunkSize) {
+              const chunk = pdfBytes.subarray(i, i + chunkSize);
+              pdfBinary += String.fromCharCode.apply(null, [...chunk]);
+            }
+            const pdfBase64 = btoa(pdfBinary);
+
+            // Extract text
+            const extractResponse = await fetch(`${env.ORIGIN_URL}/api/extract`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': env.API_SECRET_KEY,
+              },
+              body: JSON.stringify({ r2Key, documentId, pdfContent: pdfBase64 }),
+            });
+
+            if (!extractResponse.ok) {
+              message.retry();
+              continue;
+            }
+
+            const { text: extractedText } = await extractResponse.json() as { text: string };
+
+            if (extractedText && extractedText.length > 100) {
+              // Queue embedding generation
+              await env.DOCUMENT_QUEUE.send({
+                type: 'generate_embedding',
+                documentId,
+                text: extractedText.slice(0, 8000),
+                metadata,
+              });
+            }
+
+            message.ack();
+            break;
+          }
+
+          case 'generate_embedding': {
+            if (!text) {
+              message.ack();
+              continue;
+            }
+
+            // Generate embedding
+            const embeddingResponse = await env.AI.run(
+              '@cf/baai/bge-base-en-v1.5',
+              { text: [text] },
+              {
+                gateway: {
+                  id: 'internal-gateway',
+                  headers: {
+                    'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
+                  },
+                },
+              }
+            ) as { data: number[][] };
+
+            if (!embeddingResponse?.data?.[0]) {
+              message.retry();
+              continue;
+            }
+
+            // Store embedding
+            const storeResponse = await fetch(`${env.ORIGIN_URL}/api/embeddings`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': env.API_SECRET_KEY,
+              },
+              body: JSON.stringify({
+                documentId,
+                embedding: embeddingResponse.data[0],
+                metadata,
+              }),
+            });
+
+            if (!storeResponse.ok) {
+              message.retry();
+              continue;
+            }
+
+            // Queue entity extraction for Neo4j
+            await env.DOCUMENT_QUEUE.send({
+              type: 'extract_entities',
+              documentId,
+              text: text.slice(0, 4000),
+              metadata,
+            });
+
+            message.ack();
+            break;
+          }
+
+          case 'extract_entities': {
+            if (!text || !documentId) {
+              message.ack();
+              continue;
+            }
+
+            // Use Llama 3 for entity extraction
+            const entityResponse = await env.AI.run(
+              '@cf/meta/llama-3-8b-instruct',
+              {
+                messages: [
+                  {
+                    role: 'system',
+                    content: 'Extract named entities from the text. Return ONLY valid JSON: {"people":["name1","name2"],"organizations":["org1"],"locations":["loc1"],"dates":["date1"]}. No other text.',
+                  },
+                  { role: 'user', content: text },
+                ],
+                max_tokens: 1024,
+              },
+              {
+                gateway: {
+                  id: 'internal-gateway',
+                  headers: {
+                    'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
+                  },
+                },
+              }
+            ) as { response: string };
+
+            // Store entities in Neo4j
+            await fetch(`${env.ORIGIN_URL}/api/entities/batch`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': env.API_SECRET_KEY,
+              },
+              body: JSON.stringify({
+                documentId,
+                entities: entityResponse.response,
+                metadata,
+              }),
+            });
+
+            message.ack();
+            break;
+          }
+
+          default:
+            message.ack();
+        }
+      } catch (error) {
+        console.error('Queue processing error:', error);
         message.retry();
       }
     }

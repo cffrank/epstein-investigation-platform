@@ -70,15 +70,29 @@ All services run via Docker Compose at `/opt/app/docker-compose.yml`. Network: `
 - Zero Trust security with Cloudflare Access
 - Routes through nginx for internal distribution
 
-### Additional Services (Started Separately)
+### API Backend Containers (Parallel Processing)
 
-These run outside the main docker-compose:
+Four backend containers for text extraction and database operations:
 
-**epstein-api-backend** (port 3000):
-- REST API for document processing and search
-- Connects to postgres, qdrant, neo4j
-- Endpoints: `/documents/*`, `/api/stats`, `/api/process-batch`
-- Start: `docker run -d --name epstein-api-backend --network app_app_network -p 3000:3000 epstein-api-backend`
+| Container | Purpose |
+|-----------|---------|
+| epstein-api-backend | Primary backend instance |
+| epstein-api-backend-2 | Additional worker |
+| epstein-api-backend-3 | Backup worker |
+| epstein-api-backend-4 | Backup worker |
+
+- All connect to postgres, qdrant, neo4j, and R2
+- Nginx load balances across them using `least_conn`
+- Atomic document claiming via `FOR UPDATE SKIP LOCKED`
+- Routes: `/api/*` → upstream `api_backends`
+
+**Start all backend containers:**
+```bash
+docker-compose up -d --build epstein-api-backend epstein-api-backend-2 epstein-api-backend-3 epstein-api-backend-4
+docker-compose restart nginx
+```
+
+### Entity Extraction (planned)
 
 **entity-extraction** (NLP pipeline):
 - Extracts people, organizations, locations from document text
@@ -500,7 +514,7 @@ OpenClaw Agent (Claude Opus 4.5)
 
 ## Continuous Document Processing
 
-To run batch processing of documents (text extraction + embeddings):
+### Via Cloudflare Worker (single instance)
 
 ```bash
 # Single batch (50 docs at a time)
@@ -508,11 +522,8 @@ curl -X POST https://epstein-api.carl-f-frank.workers.dev/process/batch \
   -H "X-API-Key: test-api-key-12345" \
   -H "Content-Type: application/json" \
   -d '{"limit": 50}'
-```
 
-**Continuous processing loop:**
-```bash
-# Run batches continuously until stopped
+# Continuous processing loop
 while true; do
   result=$(curl -s -X POST https://epstein-api.carl-f-frank.workers.dev/process/batch \
     -H "X-API-Key: test-api-key-12345" \
@@ -523,21 +534,60 @@ while true; do
 done
 ```
 
+### Parallel Processing on Dedicated Server
+
+The backend containers use `FOR UPDATE SKIP LOCKED` for atomic document claiming, allowing true parallel processing.
+
+**Start backend containers:**
+```bash
+ssh root@88.99.61.233
+cd /opt/app
+docker-compose up -d --build epstein-api-backend epstein-api-backend-2 epstein-api-backend-3 epstein-api-backend-4
+docker-compose restart nginx
+```
+
+**Run parallel batch processing** (via tunnel):
+```bash
+# 4 parallel workers
+for i in {1..4}; do
+  while true; do
+    curl -s -X POST https://epstein-api.allfrontoffice.com/api/documents/unprocessed?limit=25 \
+      -H "X-API-Key: test-api-key-12345" &
+  done &
+done
+```
+
+**Run from dedicated server** (direct, no tunnel latency):
+```bash
+# Use the batch processor script
+cd /opt/app/scripts
+chmod +x batch-processor.sh
+
+# Run 4 parallel instances
+./batch-processor.sh 1 25 &
+./batch-processor.sh 2 25 &
+./batch-processor.sh 3 25 &
+./batch-processor.sh 4 25 &
+```
+
 **Check processing stats:**
 ```bash
 curl -s -X POST https://epstein-api.allfrontoffice.com/mcp/tools/get_stats | jq .
 ```
 
-**Processing flow:**
-1. Backend returns pending docs (50KB-5MB file size filter)
+### Processing Flow
+
+1. Backend claims pending docs atomically (`FOR UPDATE SKIP LOCKED`)
 2. Worker fetches PDF from R2
 3. Backend extracts text via pdf-parse
 4. If text extraction fails → marks as `needs_ocr` for GPU processing later
 5. If successful → Worker generates embedding via Workers AI
 6. Embedding stored in Qdrant, status updated to `completed`
 
-**Document statuses:**
+### Document Statuses
+
 - `pending` - Not yet processed
+- `processing` - Currently being processed (claimed by a worker)
 - `completed` - Text extracted and embedding generated
 - `needs_ocr` - Image-based PDF, needs GPU OCR processing
 

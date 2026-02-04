@@ -847,7 +847,7 @@ app.get('/graph/document/:filename/people', async (c) => {
 // These endpoints are called by the Cloudflare Worker
 // ============================================
 
-// Get unprocessed documents (for Cloudflare Worker)
+// Get unprocessed documents (for Cloudflare Worker) - with locking to prevent race conditions
 app.get('/api/documents/unprocessed', requireApiKey, async (c) => {
   try {
     const limit = Math.min(parseInt(c.req.query('limit') || '100'), 500);
@@ -855,12 +855,14 @@ app.get('/api/documents/unprocessed', requireApiKey, async (c) => {
     const minSize = parseInt(c.req.query('minSize') || '50000'); // Skip tiny files (likely image-only)
     const maxSize = parseInt(c.req.query('maxSize') || '5000000'); // Skip huge files
 
+    // Use CTE with FOR UPDATE SKIP LOCKED to claim documents atomically
     let sql = `
-      SELECT id as "documentId", r2_key as "r2Key", source, filename, file_size_bytes
-      FROM documents
-      WHERE embedding_status = 'pending'
-        AND r2_key IS NOT NULL
-        AND file_size_bytes BETWEEN $1 AND $2
+      WITH claimed AS (
+        SELECT id
+        FROM documents
+        WHERE embedding_status = 'pending'
+          AND r2_key IS NOT NULL
+          AND file_size_bytes BETWEEN $1 AND $2
     `;
     const params = [minSize, maxSize];
 
@@ -870,7 +872,17 @@ app.get('/api/documents/unprocessed', requireApiKey, async (c) => {
     }
 
     params.push(limit);
-    sql += ` ORDER BY file_size_bytes DESC LIMIT $${params.length}`;
+    sql += `
+        ORDER BY RANDOM()
+        LIMIT $${params.length}
+        FOR UPDATE SKIP LOCKED
+      )
+      UPDATE documents d
+      SET embedding_status = 'processing'
+      FROM claimed c
+      WHERE d.id = c.id
+      RETURNING d.id as "documentId", d.r2_key as "r2Key", d.source, d.filename, d.file_size_bytes
+    `;
 
     const result = await pool.query(sql, params);
 

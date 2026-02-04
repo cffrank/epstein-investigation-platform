@@ -229,13 +229,14 @@ def claim_documents(conn, limit: int) -> list:
     """
     Claim documents for processing using FOR UPDATE SKIP LOCKED.
     Returns list of document records.
+    Prioritizes 2026 datasets (9, 10, 11, 12) which have files on disk.
     """
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         # Find documents that need text extraction:
         # - Have a filename (should be a PDF)
         # - Don't have extracted text in metadata yet
-        # - Not marked as needs_ocr
-        # - File exists on disk (we'll verify this)
+        # - Not marked as needs_ocr or file_not_found
+        # - Prioritize datasets that have files available on disk
         cur.execute("""
             WITH claimed AS (
                 SELECT id, filename, source, r2_key, metadata
@@ -245,7 +246,13 @@ def claim_documents(conn, limit: int) -> list:
                   AND (metadata IS NULL OR metadata->>'text' IS NULL)
                   AND (metadata IS NULL OR metadata->>'needs_ocr' IS NULL)
                   AND (metadata IS NULL OR metadata->>'extraction_error' IS NULL)
-                ORDER BY created_at ASC
+                  AND (metadata IS NULL OR metadata->>'file_not_found' IS NULL)
+                ORDER BY
+                    CASE
+                        WHEN source IN ('dataset_10', 'dataset_9', 'dataset_11', 'dataset_12', 'doj_release_dec2025') THEN 0
+                        ELSE 1
+                    END,
+                    created_at ASC
                 LIMIT %s
                 FOR UPDATE SKIP LOCKED
             )

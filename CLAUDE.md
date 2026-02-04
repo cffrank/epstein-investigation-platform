@@ -12,23 +12,77 @@ ssh root@88.99.61.233
 
 ## Docker Services
 
-All services run via Docker Compose at `/opt/app/docker-compose.yml`:
+All services run via Docker Compose at `/opt/app/docker-compose.yml`. Network: `app_app_network`.
 
-| Service | Container | Internal Port | Local Bind |
-|---------|-----------|---------------|------------|
-| PostgreSQL | postgres | 5432 | 127.0.0.1:5432 |
-| Qdrant | qdrant | 6333, 6334 | 127.0.0.1:6333 |
-| Neo4j | neo4j | 7474 (http), 7687 (bolt) | 127.0.0.1:7474, 7687 |
-| Redis | redis | 6379 | 127.0.0.1:6379 |
-| OpenClaw | openclaw | 18789 | 127.0.0.1:18789 |
-| Nginx | nginx | 80 | 127.0.0.1:8080 |
-| Cloudflared | cloudflared | - | Tunnel to Cloudflare |
-| Grafana | grafana | 3000 | 127.0.0.1:3001 |
-| Prometheus | prometheus | 9090 | 127.0.0.1:9090 |
+### Core Services
 
-Additional services (started separately):
-- `epstein-api-backend` - REST API on port 3000
-- `entity-extraction` - NLP entity extraction
+| Container | Port | Memory | Purpose |
+|-----------|------|--------|---------|
+| openclaw | 18789 | 2G | **Agent Orchestrator** - Primary AI agent using Claude Opus 4.5 with MCP tools |
+| postgres | 5432 | 20G | **Document Store** - 961K+ documents with full-text search, metadata, processing status |
+| qdrant | 6333 | 24G | **Vector DB** - Document embeddings for semantic search (768-dim BGE vectors) |
+| neo4j | 7687 | 14G | **Graph DB** - Entity relationships (people, orgs, locations from documents) |
+| redis | 6379 | 2G | **Cache/Queue** - Session caching and background job queue |
+
+### Infrastructure Services
+
+| Container | Port | Purpose |
+|-----------|------|---------|
+| nginx | 8080 | **Reverse Proxy** - Routes traffic to OpenClaw gateway and API |
+| cloudflared | - | **Tunnel** - Exposes services via Cloudflare Zero Trust tunnel |
+| prometheus | 9090 | **Metrics** - Collects metrics from all services |
+| grafana | 3001 | **Dashboards** - Visualization and alerting |
+| node-exporter | 9100 | **Host Metrics** - System-level monitoring |
+
+### Container Details
+
+**openclaw** - The AI agent orchestrator:
+- Built from `./openclaw/Dockerfile`
+- Runs MCP servers internally (stdio transport, no HTTP ports)
+- MCP servers: `epstein-documents`, `epstein-intelligence`, `postgres`, `filesystem`
+- Config at `/home/node/.openclaw/mcp-servers.json`
+- Uses Anthropic API for Claude Opus 4.5
+
+**postgres** - Primary document database (PostgreSQL 16):
+- Tables: `documents`, `investigation_notes`, `source_credibility`, `allegation_tags`
+- Documents have: text content, embeddings status, R2 key references
+- Full-text search via `search_vector` tsvector column
+- Deduplication via `content_hash` MD5 column
+
+**qdrant** - Vector similarity search (v1.9.0):
+- Collection: `document_embeddings` (768 dimensions from BGE-base-en-v1.5)
+- Used for semantic document search and similarity matching
+- API key required for access
+
+**neo4j** - Knowledge graph (v5 Community):
+- Stores extracted entities: People, Organizations, Locations, Events
+- Relationships between documents and entities
+- APOC plugin enabled for graph algorithms
+
+**nginx** - Reverse proxy routing:
+- `/` → OpenClaw gateway (port 18789)
+- `/api/*` → Backend API services
+- Health checks for all services
+
+**cloudflared** - Cloudflare Tunnel:
+- Exposes to: `https://epstein-api.allfrontoffice.com`
+- Zero Trust security with Cloudflare Access
+- Routes through nginx for internal distribution
+
+### Additional Services (Started Separately)
+
+These run outside the main docker-compose:
+
+**epstein-api-backend** (port 3000):
+- REST API for document processing and search
+- Connects to postgres, qdrant, neo4j
+- Endpoints: `/documents/*`, `/api/stats`, `/api/process-batch`
+- Start: `docker run -d --name epstein-api-backend --network app_app_network -p 3000:3000 epstein-api-backend`
+
+**entity-extraction** (NLP pipeline):
+- Extracts people, organizations, locations from document text
+- Uses spaCy NER models
+- Feeds extracted entities into Neo4j
 
 ## Database Connections
 
@@ -223,6 +277,197 @@ Metadata-only datasets (JSON, no PDFs):
 - `epstein-docs`: 8,186 docs (summaries, key_people, doc classifications)
 - `epstein-docs-fulltext`: 1,743 docs (full_text extracts, entities)
 
+## Project Directory Structure
+
+### Local Development (`/home/carl/project/Epstein/`)
+```
+├── CLAUDE.md                    # This file - system documentation
+├── docker-compose.yml           # Main Docker Compose configuration
+├── cloudflare-worker/           # Cloudflare Workers code
+│   ├── src/index.ts            # Main Worker API
+│   ├── src/workflow.ts         # Workflow definitions
+│   ├── wrangler.toml           # Wrangler config
+│   └── api-backend/            # Node.js backend API
+│       └── index.js            # Backend server
+├── config/                      # Configuration files
+│   ├── nginx/                  # Nginx configs
+│   │   ├── nginx.conf
+│   │   └── conf.d/default.conf
+│   ├── postgres/               # PostgreSQL configs
+│   ├── prometheus/             # Prometheus configs
+│   └── grafana/                # Grafana dashboards
+├── openclaw/                    # OpenClaw agent config
+│   ├── Dockerfile
+│   └── config/mcp-servers.json
+├── scripts/                     # Setup and maintenance scripts
+│   ├── 01-base-setup.sh
+│   ├── 02-generate-secrets.sh
+│   ├── 03-cloudflare-setup.sh
+│   ├── 04-backup.sh
+│   └── 05-health-check.sh
+├── data/                        # Persistent data (gitignored)
+├── logs/                        # Log files
+└── backups/                     # Backup storage
+```
+
+### Remote Server (`/opt/app/`)
+```
+├── docker-compose.yml           # Same as local
+├── .env                         # Environment secrets (DO NOT COMMIT)
+├── config/                      # Same structure as local
+├── data/
+│   ├── postgres/               # PostgreSQL data
+│   ├── qdrant/                 # Qdrant vectors
+│   ├── neo4j/                  # Neo4j graph data
+│   └── redis/                  # Redis persistence
+├── logs/
+│   ├── nginx/
+│   └── neo4j/
+└── backups/
+    ├── postgres/
+    ├── qdrant/
+    └── neo4j/
+```
+
+## Nginx Routing Configuration
+
+Located at `config/nginx/conf.d/default.conf`:
+
+| Path | Destination | Access | Notes |
+|------|-------------|--------|-------|
+| `/health` | Static 200 OK | Public | Health check endpoint |
+| `/api/*` | `http://127.0.0.1:3000/` | Rate limited | Backend API (strip /api prefix) |
+| `/neo4j/*` | `http://neo4j:7474/` | Internal only (172.16.0.0/12) | Neo4j browser |
+| `/grafana/*` | `http://grafana:3000/` | Internal only | Monitoring dashboards |
+| `/qdrant/*` | `http://qdrant:6333/` | Internal only | Qdrant REST API |
+| `/openclaw/*` | `http://openclaw:18789/` | Internal only | Agent gateway (WebSocket) |
+| `/*` | 404 JSON | - | Default fallback |
+
+Rate limits: 10 requests/second with burst of 20, max 20 connections per IP.
+
+## Cloudflare Worker API Endpoints
+
+**Public Endpoints:**
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Health check with status, timestamp, environment |
+| GET | `/documents/:key` | Retrieve document from R2 (cached 24h) |
+| POST | `/search` | Vector similarity search (generates embedding, queries Qdrant) |
+| GET | `/entities/:id` | Entity lookup with D1 caching (1h TTL) |
+| POST | `/graph/traverse` | Graph traversal from start node |
+| POST | `/graph/query` | Execute Cypher query on Neo4j |
+| POST | `/faces/search` | Face similarity search |
+
+**Internal Endpoints (require X-API-Key):**
+| Method | Path | Description |
+|--------|------|-------------|
+| PUT | `/documents/:key` | Upload document to R2 |
+| POST | `/ai/generate` | Text generation (Llama 3) |
+| POST | `/ai/embedding` | Generate embedding (BGE-base) |
+| POST | `/queue/documents` | Batch enqueue documents for processing |
+| POST | `/queue/scan-unprocessed` | Scan and queue unprocessed docs |
+| GET | `/queue/status` | Get processing queue status |
+| POST | `/process/batch` | Direct batch processing (bypass queue) |
+| POST | `/workflow/document` | Start document processing workflow |
+| POST | `/workflow/batch` | Start batch processing workflow |
+| GET | `/workflow/:id` | Get workflow status |
+| GET | `/r2/list` | List R2 objects (for DB sync) |
+| POST | `/r2/sync` | Sync R2 keys with database |
+
+**Bindings (wrangler.toml):**
+- `DOCUMENTS` - R2 Bucket: `epstein-documents`
+- `CACHE_DB` - D1 Database: `epstein-cache`
+- `SESSIONS` - KV Namespace for rate limiting
+- `AI` - Workers AI with AI Gateway (`internal-gateway`)
+- `DOCUMENT_QUEUE` - Queue for document processing
+- `DLQ` - Dead letter queue for failed jobs
+- `DOCUMENT_WORKFLOW` / `BATCH_WORKFLOW` - Workflow bindings
+
+## Environment Variables
+
+Required in `/opt/app/.env`:
+```bash
+# PostgreSQL
+POSTGRES_USER=investigation
+POSTGRES_PASSWORD=kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF
+POSTGRES_DB=platform
+
+# Qdrant
+QDRANT_API_KEY=<generated>
+
+# Neo4j
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=<generated>
+
+# API Keys
+ANTHROPIC_API_KEY=<your-key>
+OPENAI_API_KEY=<your-key>
+GROQ_API_KEY=<your-key>
+
+# Cloudflare
+CLOUDFLARE_TUNNEL_TOKEN=<tunnel-token>
+
+# OpenClaw Gateway
+OPENCLAW_GATEWAY_TOKEN=<generated>
+
+# Grafana
+GRAFANA_PASSWORD=<generated>
+```
+
+## MCP Server Configuration
+
+Config: `/opt/app/openclaw/config/mcp-servers.json`
+
+```json
+{
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "env": { "POSTGRES_CONNECTION_STRING": "${DATABASE_URL}" }
+    },
+    "qdrant": {
+      "command": "npx",
+      "args": ["-y", "@qdrant/mcp-server"],
+      "env": { "QDRANT_URL": "${QDRANT_URL}", "QDRANT_API_KEY": "${QDRANT_API_KEY}" }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/node/.openclaw/workspace"]
+    }
+  }
+}
+```
+
+All MCP servers use **stdio transport** (no HTTP ports). Custom MCP servers are copied into the container at `/opt/`.
+
+## Data Flow Architecture
+
+```
+User Request
+    ↓
+Cloudflare CDN (edge caching)
+    ↓
+Cloudflare Worker (epstein-api)
+    ├── R2 (document storage)
+    ├── D1 (search/entity cache)
+    ├── Workers AI (embeddings, LLM)
+    └── Queue → DLQ
+    ↓
+Cloudflare Tunnel (cloudflared)
+    ↓
+Nginx (reverse proxy)
+    ↓
+Backend Services
+    ├── epstein-api-backend (REST API, port 3000)
+    ├── PostgreSQL (documents, metadata)
+    ├── Qdrant (vector embeddings)
+    └── Neo4j (entity graph)
+    ↓
+OpenClaw Agent (Claude Opus 4.5)
+    └── MCP Servers (stdio)
+```
+
 ## Notes
 
 - PostgreSQL port 5432 is NOT exposed publicly (127.0.0.1 only)
@@ -231,3 +476,6 @@ Metadata-only datasets (JSON, no PDFs):
 - MCP servers run inside OpenClaw container using stdio transport
 - `combined_all` dataset was deleted (redundant, all files existed in dataset_1-8)
 - Duplicate detection uses `content_hash` column with unique constraint
+- Docker network name: `app_app_network`
+- Backend API key: `test-api-key-12345` (for X-API-Key header)
+- Worker AI uses BGE-base-en-v1.5 (768 dimensions) via AI Gateway

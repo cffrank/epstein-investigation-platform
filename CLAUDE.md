@@ -498,6 +498,49 @@ OpenClaw Agent (Claude Opus 4.5)
     └── MCP Servers (stdio)
 ```
 
+## Continuous Document Processing
+
+To run batch processing of documents (text extraction + embeddings):
+
+```bash
+# Single batch (50 docs at a time)
+curl -X POST https://epstein-api.carl-f-frank.workers.dev/process/batch \
+  -H "X-API-Key: test-api-key-12345" \
+  -H "Content-Type: application/json" \
+  -d '{"limit": 50}'
+```
+
+**Continuous processing loop:**
+```bash
+# Run batches continuously until stopped
+while true; do
+  result=$(curl -s -X POST https://epstein-api.carl-f-frank.workers.dev/process/batch \
+    -H "X-API-Key: test-api-key-12345" \
+    -H "Content-Type: application/json" \
+    -d '{"limit": 50}')
+  echo "$(date): $result" | jq -c '{processed, completed, failed}'
+  sleep 2
+done
+```
+
+**Check processing stats:**
+```bash
+curl -s -X POST https://epstein-api.allfrontoffice.com/mcp/tools/get_stats | jq .
+```
+
+**Processing flow:**
+1. Backend returns pending docs (50KB-5MB file size filter)
+2. Worker fetches PDF from R2
+3. Backend extracts text via pdf-parse
+4. If text extraction fails → marks as `needs_ocr` for GPU processing later
+5. If successful → Worker generates embedding via Workers AI
+6. Embedding stored in Qdrant, status updated to `completed`
+
+**Document statuses:**
+- `pending` - Not yet processed
+- `completed` - Text extracted and embedding generated
+- `needs_ocr` - Image-based PDF, needs GPU OCR processing
+
 ## Notes
 
 - PostgreSQL port 5432 is NOT exposed publicly (127.0.0.1 only)

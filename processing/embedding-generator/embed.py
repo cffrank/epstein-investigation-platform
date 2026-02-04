@@ -84,7 +84,8 @@ def get_qdrant_client():
     return QdrantClient(
         host=QDRANT_HOST,
         port=QDRANT_PORT,
-        api_key=QDRANT_API_KEY if QDRANT_API_KEY else None
+        api_key=QDRANT_API_KEY if QDRANT_API_KEY else None,
+        https=False  # Use HTTP for internal Docker network
     )
 
 

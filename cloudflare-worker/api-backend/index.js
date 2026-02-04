@@ -28,11 +28,12 @@ const pool = new Pool({
   ssl: false,
 });
 
-// Qdrant client
+// Qdrant client (use HTTP, not HTTPS)
 const qdrant = new QdrantClient({
   host: process.env.QDRANT_HOST || 'localhost',
   port: parseInt(process.env.QDRANT_PORT || '6333'),
   apiKey: process.env.QDRANT_API_KEY,
+  https: false,
 });
 
 // Neo4j driver
@@ -44,7 +45,19 @@ const neo4jDriver = neo4j.driver(
   )
 );
 
+// API key for internal requests from Cloudflare Worker
+const API_SECRET_KEY = process.env.API_SECRET_KEY || '';
+
 const app = new Hono();
+
+// Middleware to verify API key for processing endpoints
+const requireApiKey = async (c, next) => {
+  const apiKey = c.req.header('X-API-Key');
+  if (API_SECRET_KEY && apiKey !== API_SECRET_KEY) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  await next();
+};
 
 // Health check
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: Date.now() }));
@@ -109,6 +122,144 @@ app.post('/vector-search', async (c) => {
     });
   } catch (error) {
     console.error('Vector search error:', error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get sync stats (must be defined BEFORE /documents/:filename)
+app.get('/documents/sync-stats', requireApiKey, async (c) => {
+  try {
+    const stats = await pool.query(`
+      SELECT
+        COUNT(*) as total,
+        COUNT(r2_key) as with_r2_key,
+        COUNT(*) - COUNT(r2_key) as missing_r2_key,
+        COUNT(CASE WHEN embedding_status = 'pending' THEN 1 END) as pending,
+        COUNT(CASE WHEN embedding_status = 'completed' THEN 1 END) as completed,
+        COUNT(CASE WHEN embedding_status = 'failed' THEN 1 END) as failed
+      FROM documents
+    `);
+
+    const byPrefix = await pool.query(`
+      SELECT
+        CASE
+          WHEN r2_key LIKE 'dataset_%' THEN split_part(r2_key, '/', 1)
+          WHEN r2_key LIKE 'documents/%' THEN 'documents/...'
+          WHEN r2_key LIKE 'epstein-docs/%' THEN 'epstein-docs/...'
+          WHEN r2_key IS NULL THEN 'NO_R2_KEY'
+          ELSE 'other'
+        END as prefix,
+        COUNT(*) as count
+      FROM documents
+      GROUP BY 1
+      ORDER BY count DESC
+    `);
+
+    return c.json({
+      overview: stats.rows[0],
+      byPrefix: byPrefix.rows,
+    });
+  } catch (error) {
+    console.error('Sync stats error:', error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Sync R2 keys with database - match by filename and update r2_key
+app.post('/documents/sync-r2-keys', requireApiKey, async (c) => {
+  try {
+    const { r2Keys } = await c.req.json();
+
+    if (!r2Keys || !Array.isArray(r2Keys)) {
+      return c.json({ error: 'r2Keys array required' }, 400);
+    }
+
+    let updated = 0;
+    let notFound = 0;
+    let alreadySet = 0;
+
+    for (const r2Key of r2Keys) {
+      const key = typeof r2Key === 'string' ? r2Key : r2Key.key;
+
+      // Extract filename from r2 key (last part of path)
+      const filename = key.split('/').pop();
+
+      if (!filename) continue;
+
+      // Find document by filename where r2_key is wrong or null
+      const result = await pool.query(`
+        UPDATE documents
+        SET r2_key = $1,
+            embedding_status = CASE
+              WHEN embedding_status = 'failed' THEN 'pending'
+              ELSE embedding_status
+            END
+        WHERE filename = $2
+          AND (r2_key IS NULL OR r2_key != $1)
+        RETURNING id
+      `, [key, filename]);
+
+      if (result.rowCount > 0) {
+        updated++;
+      } else {
+        // Check if it's already set correctly
+        const check = await pool.query(
+          'SELECT id FROM documents WHERE filename = $1 AND r2_key = $2',
+          [filename, key]
+        );
+        if (check.rowCount > 0) {
+          alreadySet++;
+        } else {
+          notFound++;
+        }
+      }
+    }
+
+    return c.json({
+      success: true,
+      processed: r2Keys.length,
+      updated,
+      alreadySet,
+      notFound,
+    });
+  } catch (error) {
+    console.error('Sync R2 keys error:', error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Get unprocessed documents (must be defined BEFORE /documents/:filename)
+// This endpoint is called by Cloudflare Worker via nginx /api/ proxy
+app.get('/documents/unprocessed', requireApiKey, async (c) => {
+  try {
+    const limit = Math.min(parseInt(c.req.query('limit') || '100'), 500);
+    const source = c.req.query('source');
+
+    let sql = `
+      SELECT id as "documentId", r2_key as "r2Key", source, filename
+      FROM documents
+      WHERE embedding_status = 'pending'
+        AND r2_key IS NOT NULL
+        AND (r2_key LIKE 'dataset_9/%' OR r2_key LIKE 'dataset_10/%' OR r2_key LIKE 'dataset_11/%')
+    `;
+    const params = [];
+
+    if (source) {
+      params.push(source);
+      sql += ` AND source = $${params.length}`;
+    }
+
+    params.push(limit);
+    sql += ` ORDER BY created_at ASC LIMIT $${params.length}`;
+
+    const result = await pool.query(sql, params);
+
+    return c.json({
+      count: result.rows.length,
+      documents: result.rows,
+    });
+  } catch (error) {
+    console.error('Unprocessed query error:', error);
     return c.json({ error: error.message }, 500);
   }
 });
@@ -692,36 +843,507 @@ app.get('/graph/document/:filename/people', async (c) => {
 });
 
 // ============================================
-// DOCUMENT PROCESSING ENDPOINTS
+// CLOUDFLARE WORKER API ENDPOINTS (/api/...)
+// These endpoints are called by the Cloudflare Worker
 // ============================================
 
-// Extract text from PDF in R2
-app.post('/extract', async (c) => {
+// Get unprocessed documents (for Cloudflare Worker)
+app.get('/api/documents/unprocessed', requireApiKey, async (c) => {
   try {
-    const { r2Key, documentId } = await c.req.json();
+    const limit = Math.min(parseInt(c.req.query('limit') || '100'), 500);
+    const source = c.req.query('source');
+    const minSize = parseInt(c.req.query('minSize') || '50000'); // Skip tiny files (likely image-only)
+    const maxSize = parseInt(c.req.query('maxSize') || '5000000'); // Skip huge files
 
-    if (!r2Key) {
-      return c.json({ error: 'r2Key required' }, 400);
+    let sql = `
+      SELECT id as "documentId", r2_key as "r2Key", source, filename, file_size_bytes
+      FROM documents
+      WHERE embedding_status = 'pending'
+        AND r2_key IS NOT NULL
+        AND file_size_bytes BETWEEN $1 AND $2
+    `;
+    const params = [minSize, maxSize];
+
+    if (source) {
+      params.push(source);
+      sql += ` AND source = $${params.length}`;
     }
 
-    // Get PDF from R2
-    const command = new GetObjectCommand({
-      Bucket: process.env.R2_BUCKET || 'epstein-documents',
-      Key: r2Key,
-    });
+    params.push(limit);
+    sql += ` ORDER BY file_size_bytes DESC LIMIT $${params.length}`;
 
-    const response = await r2Client.send(command);
-    const pdfBuffer = Buffer.from(await response.Body.transformToByteArray());
+    const result = await pool.query(sql, params);
+
+    return c.json({
+      count: result.rows.length,
+      documents: result.rows,
+    });
+  } catch (error) {
+    console.error('Get unprocessed error:', error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Extract text from document (for Cloudflare Worker)
+app.post('/api/extract', requireApiKey, async (c) => {
+  try {
+    const { r2Key, documentId, pdfContent } = await c.req.json();
+
+    let pdfBuffer;
+
+    // If PDF content is provided (from Worker), use it directly
+    if (pdfContent) {
+      pdfBuffer = Buffer.from(pdfContent, 'base64');
+    } else if (r2Key) {
+      // Fallback to fetching from R2 if no content provided
+      const command = new GetObjectCommand({
+        Bucket: process.env.R2_BUCKET || 'epstein-documents',
+        Key: r2Key,
+      });
+      const response = await r2Client.send(command);
+      pdfBuffer = Buffer.from(await response.Body.transformToByteArray());
+    } else {
+      return c.json({ error: 'pdfContent or r2Key required' }, 400);
+    }
 
     // Extract text
-    const data = await pdf(pdfBuffer);
+    let data;
+    let text = '';
+    let needsOcr = false;
+
+    try {
+      data = await pdf(pdfBuffer);
+      text = data.text?.trim() || '';
+
+      // Check if it's an image-based PDF (little to no text extracted)
+      if (text.length < 50 && data.numpages > 0) {
+        needsOcr = true;
+      }
+    } catch (pdfError) {
+      // PDF parsing failed - likely image-based or corrupted
+      console.log(`PDF parse failed for ${documentId}: ${pdfError.message}`);
+      needsOcr = true;
+      data = { numpages: 0 };
+    }
+
+    // Update document in PostgreSQL
+    if (documentId) {
+      if (needsOcr) {
+        // Mark for GPU OCR processing
+        await pool.query(
+          `UPDATE documents
+           SET ocr_status = 'needs_ocr',
+               embedding_status = 'needs_ocr',
+               metadata = jsonb_set(COALESCE(metadata, '{}'), '{needs_ocr}', 'true'::jsonb),
+               processed_at = NOW()
+           WHERE id = $1`,
+          [documentId]
+        );
+        return c.json({
+          documentId,
+          r2Key,
+          text: '',
+          pageCount: data.numpages || 0,
+          needsOcr: true,
+          message: 'Document marked for GPU OCR processing'
+        });
+      } else if (text.length > 50) {
+        await pool.query(
+          `UPDATE documents
+           SET metadata = jsonb_set(COALESCE(metadata, '{}'), '{extracted_text}', $1::jsonb),
+               ocr_status = 'completed',
+               processed_at = NOW()
+           WHERE id = $2`,
+          [JSON.stringify(text.slice(0, 50000)), documentId]
+        );
+      }
+    }
 
     return c.json({
       documentId,
       r2Key,
-      text: data.text,
+      text: text.slice(0, 8000),
+      pageCount: data.numpages || 0,
+      needsOcr: false,
+    });
+  } catch (error) {
+    console.error('Extract error:', error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Store embeddings in Qdrant (for Cloudflare Worker)
+app.post('/api/embeddings', requireApiKey, async (c) => {
+  try {
+    const { documentId, embedding, metadata = {} } = await c.req.json();
+
+    if (!documentId || !embedding) {
+      return c.json({ error: 'documentId and embedding required' }, 400);
+    }
+
+    // Get document info from PostgreSQL
+    const docResult = await pool.query(
+      `SELECT filename, source, r2_key FROM documents WHERE id = $1`,
+      [documentId]
+    );
+
+    if (docResult.rows.length === 0) {
+      return c.json({ error: 'Document not found' }, 404);
+    }
+
+    const doc = docResult.rows[0];
+
+    // Generate a numeric ID for Qdrant (hash of UUID)
+    const pointId = Math.abs(hashCode(documentId)) % Number.MAX_SAFE_INTEGER;
+
+    // Upsert to Qdrant
+    await qdrant.upsert('document_embeddings', {
+      wait: true,
+      points: [
+        {
+          id: pointId,
+          vector: embedding,
+          payload: {
+            document_id: documentId,
+            filename: doc.filename,
+            source: doc.source,
+            r2_key: doc.r2_key,
+            ...metadata,
+          },
+        },
+      ],
+    });
+
+    // Update document status in PostgreSQL
+    await pool.query(
+      `UPDATE documents
+       SET embedding_status = 'completed',
+           search_vector = to_tsvector('english', COALESCE(metadata->>'extracted_text', ''))
+       WHERE id = $1`,
+      [documentId]
+    );
+
+    return c.json({
+      success: true,
+      documentId,
+      pointId,
+    });
+  } catch (error) {
+    console.error('Store embedding error:', error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Store entities in Neo4j (for Cloudflare Worker)
+app.post('/api/entities/batch', requireApiKey, async (c) => {
+  const session = neo4jDriver.session();
+  try {
+    const { documentId, entities, metadata = {} } = await c.req.json();
+
+    if (!documentId) {
+      return c.json({ error: 'documentId required' }, 400);
+    }
+
+    // Get document info
+    const docResult = await pool.query(
+      `SELECT filename, source FROM documents WHERE id = $1`,
+      [documentId]
+    );
+
+    if (docResult.rows.length === 0) {
+      return c.json({ error: 'Document not found' }, 404);
+    }
+
+    const doc = docResult.rows[0];
+
+    // Parse entities if string
+    let parsedEntities = entities;
+    if (typeof entities === 'string') {
+      try {
+        parsedEntities = JSON.parse(entities);
+      } catch (e) {
+        // Try to extract JSON from the response
+        const match = entities.match(/\{[\s\S]*\}/);
+        if (match) {
+          parsedEntities = JSON.parse(match[0]);
+        } else {
+          return c.json({ error: 'Invalid entities format' }, 400);
+        }
+      }
+    }
+
+    const { people = [], organizations = [], locations = [], dates = [] } = parsedEntities || {};
+
+    let created = 0;
+
+    // Create Document node
+    await session.run(
+      `MERGE (d:Document {filename: $filename})
+       SET d.source = $source, d.document_id = $documentId`,
+      { filename: doc.filename, source: doc.source, documentId }
+    );
+
+    // Create Person nodes and relationships
+    for (const person of people) {
+      if (person && person.trim() && person.trim().length > 2) {
+        await session.run(
+          `MERGE (p:Person {name: $name})
+           WITH p
+           MATCH (d:Document {filename: $filename})
+           MERGE (p)-[:MENTIONED_IN]->(d)`,
+          { name: person.trim(), filename: doc.filename }
+        );
+        created++;
+      }
+    }
+
+    // Create Organization nodes and relationships
+    for (const org of organizations) {
+      if (org && org.trim() && org.trim().length > 2) {
+        await session.run(
+          `MERGE (o:Organization {name: $name})
+           WITH o
+           MATCH (d:Document {filename: $filename})
+           MERGE (o)-[:MENTIONED_IN]->(d)`,
+          { name: org.trim(), filename: doc.filename }
+        );
+        created++;
+      }
+    }
+
+    // Create Location nodes and relationships
+    for (const loc of locations) {
+      if (loc && loc.trim() && loc.trim().length > 2) {
+        await session.run(
+          `MERGE (l:Location {name: $name})
+           WITH l
+           MATCH (d:Document {filename: $filename})
+           MERGE (l)-[:MENTIONED_IN]->(d)`,
+          { name: loc.trim(), filename: doc.filename }
+        );
+        created++;
+      }
+    }
+
+    return c.json({
+      success: true,
+      documentId,
+      entitiesCreated: created,
+      counts: {
+        people: people.length,
+        organizations: organizations.length,
+        locations: locations.length,
+        dates: dates.length,
+      },
+    });
+  } catch (error) {
+    console.error('Store entities error:', error);
+    return c.json({ error: error.message }, 500);
+  } finally {
+    await session.close();
+  }
+});
+
+// Vector search (for Cloudflare Worker)
+app.post('/api/search', requireApiKey, async (c) => {
+  try {
+    const { vector, limit = 10, filters } = await c.req.json();
+
+    if (!vector || !Array.isArray(vector)) {
+      return c.json({ error: 'vector array required' }, 400);
+    }
+
+    const searchResult = await qdrant.search('document_embeddings', {
+      vector,
+      limit,
+      with_payload: true,
+      filter: filters,
+    });
+
+    return c.json({
+      count: searchResult.length,
+      results: searchResult,
+    });
+  } catch (error) {
+    console.error('Vector search error:', error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// Face search placeholder (for Cloudflare Worker)
+app.post('/api/faces/search', requireApiKey, async (c) => {
+  return c.json({
+    count: 0,
+    results: [],
+    message: 'Face search not yet implemented',
+  });
+});
+
+// Graph query (for Cloudflare Worker)
+app.post('/api/graph/query', requireApiKey, async (c) => {
+  const session = neo4jDriver.session();
+  try {
+    const { query, params = {} } = await c.req.json();
+
+    if (!query) {
+      return c.json({ error: 'Cypher query required' }, 400);
+    }
+
+    // Block destructive queries
+    const lowerQuery = query.toLowerCase();
+    if (lowerQuery.includes('delete') || lowerQuery.includes('remove') ||
+        lowerQuery.includes('drop') || lowerQuery.includes('create') ||
+        lowerQuery.includes('merge') || lowerQuery.includes('set')) {
+      return c.json({ error: 'Only read queries allowed' }, 403);
+    }
+
+    const result = await session.run(query, params);
+
+    const records = result.records.map(record => {
+      const obj = {};
+      record.keys.forEach((key, i) => {
+        const value = record.get(i);
+        obj[key] = neo4jValueToJS(value);
+      });
+      return obj;
+    });
+
+    return c.json({
+      count: records.length,
+      records,
+    });
+  } catch (error) {
+    console.error('Graph query error:', error);
+    return c.json({ error: error.message }, 500);
+  } finally {
+    await session.close();
+  }
+});
+
+// Graph traversal (for Cloudflare Worker)
+app.post('/api/graph/traverse', requireApiKey, async (c) => {
+  const session = neo4jDriver.session();
+  try {
+    const { startNode, relationshipTypes = [], maxDepth = 2, limit = 50 } = await c.req.json();
+
+    if (!startNode) {
+      return c.json({ error: 'startNode required' }, 400);
+    }
+
+    const safeDepth = Math.min(maxDepth, 4);
+    const safeLimit = Math.min(limit, 100);
+
+    let relPattern = relationshipTypes.length > 0
+      ? `[:${relationshipTypes.join('|')}*1..${safeDepth}]`
+      : `[*1..${safeDepth}]`;
+
+    const query = `
+      MATCH (start {name: $startNode})
+      MATCH path = (start)-${relPattern}-(connected)
+      WITH connected, min(length(path)) as distance
+      RETURN DISTINCT connected.name as name,
+             labels(connected) as labels,
+             distance
+      ORDER BY distance, name
+      LIMIT $limit
+    `;
+
+    const result = await session.run(query, { startNode, limit: neo4j.int(safeLimit) });
+
+    const connections = result.records.map(record => ({
+      name: record.get('name'),
+      labels: record.get('labels'),
+      distance: record.get('distance').toNumber(),
+    }));
+
+    return c.json({
+      startNode,
+      maxDepth: safeDepth,
+      count: connections.length,
+      connections,
+    });
+  } catch (error) {
+    console.error('Graph traversal error:', error);
+    return c.json({ error: error.message }, 500);
+  } finally {
+    await session.close();
+  }
+});
+
+// Entity lookup (for Cloudflare Worker)
+app.get('/api/entities/:id', requireApiKey, async (c) => {
+  try {
+    const id = c.req.param('id');
+
+    const result = await pool.query(
+      `SELECT
+        $1 as entity_id,
+        COUNT(*) as document_count,
+        array_agg(DISTINCT source) as datasets
+      FROM documents
+      WHERE metadata->>'extracted_text' ILIKE $2
+      GROUP BY 1`,
+      [id, `%${id.replace(/-/g, ' ')}%`]
+    );
+
+    if (result.rows.length === 0) {
+      return c.json({ error: 'Entity not found' }, 404);
+    }
+
+    return c.json(result.rows[0]);
+  } catch (error) {
+    console.error('Entity error:', error);
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+// ============================================
+// DOCUMENT PROCESSING ENDPOINTS (legacy)
+// ============================================
+
+// Extract text from PDF in R2 (for Cloudflare Worker via nginx /api/ proxy)
+app.post('/extract', requireApiKey, async (c) => {
+  try {
+    const { r2Key, documentId, pdfContent } = await c.req.json();
+
+    let pdfBuffer;
+
+    // If PDF content is provided (from Worker), use it directly
+    if (pdfContent) {
+      pdfBuffer = Buffer.from(pdfContent, 'base64');
+    } else if (r2Key) {
+      // Fallback to fetching from R2 if no content provided
+      const command = new GetObjectCommand({
+        Bucket: process.env.R2_BUCKET || 'epstein-documents',
+        Key: r2Key,
+      });
+      const response = await r2Client.send(command);
+      pdfBuffer = Buffer.from(await response.Body.transformToByteArray());
+    } else {
+      return c.json({ error: 'pdfContent or r2Key required' }, 400);
+    }
+
+    // Extract text
+    const data = await pdf(pdfBuffer);
+    const text = data.text?.slice(0, 8000) || '';
+
+    // Update document in PostgreSQL
+    if (documentId && text.length > 50) {
+      await pool.query(
+        `UPDATE documents
+         SET metadata = jsonb_set(COALESCE(metadata, '{}'), '{extracted_text}', $1::jsonb),
+             ocr_status = 'completed',
+             processed_at = NOW()
+         WHERE id = $2`,
+        [JSON.stringify(text.slice(0, 50000)), documentId]
+      );
+    }
+
+    return c.json({
+      documentId,
+      r2Key,
+      text,
       pageCount: data.numpages,
-      info: data.info,
     });
   } catch (error) {
     console.error('Text extraction error:', error);
@@ -814,45 +1436,6 @@ app.post('/documents/complete', async (c) => {
   }
 });
 
-// Get unprocessed documents (no extracted text)
-app.get('/documents/unprocessed', async (c) => {
-  try {
-    const limit = Math.min(parseInt(c.req.query('limit') || '100'), 1000);
-    const source = c.req.query('source');
-
-    let sql = `
-      SELECT id, filename, source, r2_key
-      FROM documents
-      WHERE r2_key IS NOT NULL
-        AND (metadata->>'extracted_text' IS NULL OR metadata->>'extracted_text' = '')
-    `;
-    const params = [];
-
-    if (source) {
-      sql += ` AND source = $1`;
-      params.push(source);
-    }
-
-    sql += ` ORDER BY id LIMIT $${params.length + 1}`;
-    params.push(limit);
-
-    const result = await pool.query(sql, params);
-
-    return c.json({
-      count: result.rows.length,
-      documents: result.rows.map(r => ({
-        documentId: r.id.toString(),
-        filename: r.filename,
-        source: r.source,
-        r2Key: r.r2_key,
-      })),
-    });
-  } catch (error) {
-    console.error('Unprocessed query error:', error);
-    return c.json({ error: error.message }, 500);
-  }
-});
-
 // Get processing stats
 app.get('/processing/stats', async (c) => {
   try {
@@ -884,26 +1467,174 @@ app.get('/processing/stats', async (c) => {
   }
 });
 
-// Store embedding directly
-app.post('/embeddings', async (c) => {
+// Store embedding directly (for Cloudflare Worker via nginx /api/ proxy)
+app.post('/embeddings', requireApiKey, async (c) => {
   try {
-    const { documentId, embedding, metadata } = await c.req.json();
+    const { documentId, embedding, metadata = {} } = await c.req.json();
 
+    if (!documentId || !embedding) {
+      return c.json({ error: 'documentId and embedding required' }, 400);
+    }
+
+    // Get document info from PostgreSQL
+    const docResult = await pool.query(
+      `SELECT filename, source, r2_key FROM documents WHERE id = $1`,
+      [documentId]
+    );
+
+    if (docResult.rows.length === 0) {
+      return c.json({ error: 'Document not found' }, 404);
+    }
+
+    const doc = docResult.rows[0];
+
+    // Generate a numeric ID for Qdrant (hash of UUID)
+    const pointId = Math.abs(hashCode(documentId)) % Number.MAX_SAFE_INTEGER;
+
+    // Upsert to Qdrant
     await qdrant.upsert('document_embeddings', {
       wait: true,
       points: [{
-        id: documentId,
+        id: pointId,
         vector: embedding,
-        payload: metadata || {},
+        payload: {
+          document_id: documentId,
+          filename: doc.filename,
+          source: doc.source,
+          r2_key: doc.r2_key,
+          ...metadata,
+        },
       }],
     });
 
-    return c.json({ success: true, documentId });
+    // Update document status in PostgreSQL
+    await pool.query(
+      `UPDATE documents
+       SET embedding_status = 'completed',
+           search_vector = to_tsvector('english', COALESCE(metadata->>'extracted_text', ''))
+       WHERE id = $1`,
+      [documentId]
+    );
+
+    return c.json({ success: true, documentId, pointId });
   } catch (error) {
     console.error('Embedding storage error:', error);
     return c.json({ error: error.message }, 500);
   }
 });
+
+// Store entities in Neo4j (for Cloudflare Worker via nginx /api/ proxy)
+app.post('/entities/batch', requireApiKey, async (c) => {
+  const session = neo4jDriver.session();
+  try {
+    const { documentId, entities, metadata = {} } = await c.req.json();
+
+    if (!documentId) {
+      return c.json({ error: 'documentId required' }, 400);
+    }
+
+    // Get document info
+    const docResult = await pool.query(
+      `SELECT filename, source FROM documents WHERE id = $1`,
+      [documentId]
+    );
+
+    if (docResult.rows.length === 0) {
+      return c.json({ error: 'Document not found' }, 404);
+    }
+
+    const doc = docResult.rows[0];
+
+    // Parse entities if string
+    let parsedEntities = entities;
+    if (typeof entities === 'string') {
+      try {
+        parsedEntities = JSON.parse(entities);
+      } catch (e) {
+        const match = entities.match(/\{[\s\S]*\}/);
+        if (match) {
+          parsedEntities = JSON.parse(match[0]);
+        } else {
+          return c.json({ error: 'Invalid entities format' }, 400);
+        }
+      }
+    }
+
+    const { people = [], organizations = [], locations = [], dates = [] } = parsedEntities || {};
+    let created = 0;
+
+    // Create Document node
+    await session.run(
+      `MERGE (d:Document {filename: $filename})
+       SET d.source = $source, d.document_id = $documentId`,
+      { filename: doc.filename, source: doc.source, documentId }
+    );
+
+    // Create Person nodes and relationships
+    for (const person of people) {
+      if (person && person.trim() && person.trim().length > 2) {
+        await session.run(
+          `MERGE (p:Person {name: $name})
+           WITH p
+           MATCH (d:Document {filename: $filename})
+           MERGE (p)-[:MENTIONED_IN]->(d)`,
+          { name: person.trim(), filename: doc.filename }
+        );
+        created++;
+      }
+    }
+
+    // Create Organization nodes
+    for (const org of organizations) {
+      if (org && org.trim() && org.trim().length > 2) {
+        await session.run(
+          `MERGE (o:Organization {name: $name})
+           WITH o
+           MATCH (d:Document {filename: $filename})
+           MERGE (o)-[:MENTIONED_IN]->(d)`,
+          { name: org.trim(), filename: doc.filename }
+        );
+        created++;
+      }
+    }
+
+    // Create Location nodes
+    for (const loc of locations) {
+      if (loc && loc.trim() && loc.trim().length > 2) {
+        await session.run(
+          `MERGE (l:Location {name: $name})
+           WITH l
+           MATCH (d:Document {filename: $filename})
+           MERGE (l)-[:MENTIONED_IN]->(d)`,
+          { name: loc.trim(), filename: doc.filename }
+        );
+        created++;
+      }
+    }
+
+    return c.json({
+      success: true,
+      documentId,
+      entitiesCreated: created,
+    });
+  } catch (error) {
+    console.error('Store entities error:', error);
+    return c.json({ error: error.message }, 500);
+  } finally {
+    await session.close();
+  }
+});
+
+// Hash function for generating numeric IDs for Qdrant
+function hashCode(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return hash;
+}
 
 // Helper function to convert Neo4j values to JS
 function neo4jValueToJS(value) {

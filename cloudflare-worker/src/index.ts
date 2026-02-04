@@ -511,6 +511,143 @@ app.post('/queue/documents', async (c) => {
   }
 });
 
+// Direct batch processing (bypass queue for now)
+app.post('/process/batch', async (c) => {
+  try {
+    const apiKey = c.req.header('X-API-Key');
+    if (apiKey !== c.env.API_SECRET_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const body = await c.req.json().catch(() => ({}));
+    const { limit = 10 } = body as { limit?: number };
+    const safeLimit = Math.min(limit, 50);
+
+    // Get unprocessed documents
+    const url = new URL(`${c.env.ORIGIN_URL}/api/documents/unprocessed`);
+    url.searchParams.set('limit', safeLimit.toString());
+
+    const response = await fetch(url.toString(), {
+      headers: { 'X-API-Key': c.env.API_SECRET_KEY },
+    });
+
+    if (!response.ok) {
+      return c.json({ error: 'Failed to get documents' }, 502);
+    }
+
+    const { documents } = await response.json() as {
+      documents: Array<{ documentId: string; r2Key: string; source: string }>
+    };
+
+    if (!documents || documents.length === 0) {
+      return c.json({ message: 'No unprocessed documents', processed: 0 });
+    }
+
+    const results: Array<{ documentId: string; status: string; error?: string }> = [];
+
+    for (const doc of documents) {
+      try {
+        // Get PDF from R2
+        const object = await c.env.DOCUMENTS.get(doc.r2Key);
+        if (!object) {
+          results.push({ documentId: doc.documentId, status: 'not_found' });
+          continue;
+        }
+
+        // Read and encode PDF
+        const pdfArrayBuffer = await object.arrayBuffer();
+        if (pdfArrayBuffer.byteLength > 10 * 1024 * 1024) {
+          results.push({ documentId: doc.documentId, status: 'too_large' });
+          continue;
+        }
+
+        const pdfBytes = new Uint8Array(pdfArrayBuffer);
+        let pdfBinary = '';
+        const chunkSize = 32768;
+        for (let i = 0; i < pdfBytes.length; i += chunkSize) {
+          const chunk = pdfBytes.subarray(i, i + chunkSize);
+          pdfBinary += String.fromCharCode.apply(null, [...chunk]);
+        }
+        const pdfBase64 = btoa(pdfBinary);
+
+        // Extract text
+        const extractResponse = await fetch(`${c.env.ORIGIN_URL}/api/extract`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': c.env.API_SECRET_KEY,
+          },
+          body: JSON.stringify({
+            r2Key: doc.r2Key,
+            documentId: doc.documentId,
+            pdfContent: pdfBase64
+          }),
+        });
+
+        if (!extractResponse.ok) {
+          results.push({ documentId: doc.documentId, status: 'extract_failed' });
+          continue;
+        }
+
+        const { text } = await extractResponse.json() as { text: string };
+
+        if (text && text.length > 100) {
+          // Generate embedding
+          const embeddingResponse = await c.env.AI.run(
+            '@cf/baai/bge-base-en-v1.5',
+            { text: [text.slice(0, 8000)] },
+            {
+              gateway: {
+                id: 'internal-gateway',
+                headers: {
+                  'cf-aig-authorization': `Bearer ${c.env.AI_GATEWAY_TOKEN}`,
+                },
+              },
+            }
+          ) as { data: number[][] };
+
+          if (embeddingResponse?.data?.[0]) {
+            // Store embedding
+            await fetch(`${c.env.ORIGIN_URL}/api/embeddings`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': c.env.API_SECRET_KEY,
+              },
+              body: JSON.stringify({
+                documentId: doc.documentId,
+                embedding: embeddingResponse.data[0],
+                metadata: { source: doc.source },
+              }),
+            });
+          }
+        }
+
+        results.push({ documentId: doc.documentId, status: 'completed' });
+      } catch (error) {
+        results.push({
+          documentId: doc.documentId,
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+
+    const completed = results.filter(r => r.status === 'completed').length;
+    return c.json({
+      success: true,
+      processed: documents.length,
+      completed,
+      failed: documents.length - completed,
+      results,
+      requestId: c.get('requestId'),
+    });
+  } catch (error) {
+    console.error('Batch processing error:', error);
+    return c.json({ error: 'Batch processing failed' }, 500);
+  }
+});
+
 // Scan and queue unprocessed documents
 app.post('/queue/scan-unprocessed', async (c) => {
   try {
@@ -691,6 +828,78 @@ app.get('/workflow/:id', async (c) => {
   }
 });
 
+// List R2 objects for database sync
+app.get('/r2/list', async (c) => {
+  try {
+    const apiKey = c.req.header('X-API-Key');
+    if (apiKey !== c.env.API_SECRET_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const prefix = c.req.query('prefix') || '';
+    const cursor = c.req.query('cursor');
+    const limit = Math.min(parseInt(c.req.query('limit') || '1000'), 1000);
+
+    const listed = await c.env.DOCUMENTS.list({
+      prefix,
+      cursor: cursor || undefined,
+      limit,
+    });
+
+    const objects = listed.objects.map(obj => ({
+      key: obj.key,
+      size: obj.size,
+      uploaded: obj.uploaded.toISOString(),
+    }));
+
+    return c.json({
+      objects,
+      cursor: listed.truncated ? listed.cursor : null,
+      truncated: listed.truncated,
+      count: objects.length,
+    });
+  } catch (error) {
+    console.error('R2 list error:', error);
+    return c.json({ error: 'Failed to list R2 objects' }, 500);
+  }
+});
+
+// Sync R2 keys with database - updates documents where filename matches
+app.post('/r2/sync', async (c) => {
+  try {
+    const apiKey = c.req.header('X-API-Key');
+    if (apiKey !== c.env.API_SECRET_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const body = await c.req.json();
+    const { r2Keys } = body as { r2Keys: Array<{ key: string; size: number }> };
+
+    if (!r2Keys || !Array.isArray(r2Keys)) {
+      return c.json({ error: 'r2Keys array required' }, 400);
+    }
+
+    // Send to backend for database update
+    const response = await fetch(`${c.env.ORIGIN_URL}/api/documents/sync-r2-keys`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': c.env.API_SECRET_KEY,
+      },
+      body: JSON.stringify({ r2Keys }),
+    });
+
+    if (!response.ok) {
+      return c.json({ error: 'Backend sync failed' }, 502);
+    }
+
+    return response;
+  } catch (error) {
+    console.error('R2 sync error:', error);
+    return c.json({ error: 'Sync failed' }, 500);
+  }
+});
+
 // 404 handler
 app.notFound((c) => {
   return c.json({
@@ -723,9 +932,21 @@ async function processQueueBatch(
   batch: MessageBatch<DocumentMessage>,
   env: Bindings
 ): Promise<void> {
+  // Minimal test: just log and ack all messages
+  console.log(`QUEUE CONSUMER INVOKED: ${batch.messages.length} messages`);
+
   for (const message of batch.messages) {
     try {
-      const { type, documentId, r2Key, text, metadata } = message.body;
+      const { type, documentId, r2Key } = message.body;
+      console.log(`QUEUE MSG: ${type} - ${documentId?.slice(0, 8)} - ${r2Key?.slice(0, 30)}`);
+
+      // For now, just ack all messages to test if consumer is working
+      message.ack();
+      continue;
+
+      // Original processing code below (disabled for testing)
+      const { text, metadata } = message.body;
+      console.log(`[QUEUE] Processing document: ${r2Key}`);
 
       switch (type) {
         case 'process_document': {
@@ -742,14 +963,33 @@ async function processQueueBatch(
             continue;
           }
 
-          // For PDFs, send to origin for text extraction
+          // Read PDF content and convert to base64 (chunked for large files)
+          const pdfArrayBuffer = await object.arrayBuffer();
+
+          // Skip files larger than 10MB to avoid timeout issues
+          if (pdfArrayBuffer.byteLength > 10 * 1024 * 1024) {
+            console.log(`Skipping large file (${pdfArrayBuffer.byteLength} bytes): ${r2Key}`);
+            message.ack();
+            continue;
+          }
+
+          const pdfBytes = new Uint8Array(pdfArrayBuffer);
+          let pdfBinary = '';
+          const chunkSize = 32768;
+          for (let i = 0; i < pdfBytes.length; i += chunkSize) {
+            const chunk = pdfBytes.subarray(i, i + chunkSize);
+            pdfBinary += String.fromCharCode.apply(null, [...chunk]);
+          }
+          const pdfBase64 = btoa(pdfBinary);
+
+          // Send PDF content to origin for text extraction
           const extractResponse = await fetch(`${env.ORIGIN_URL}/api/extract`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'X-API-Key': env.API_SECRET_KEY,
             },
-            body: JSON.stringify({ r2Key, documentId }),
+            body: JSON.stringify({ r2Key, documentId, pdfContent: pdfBase64 }),
           });
 
           if (!extractResponse.ok) {
@@ -879,7 +1119,19 @@ async function processQueueBatch(
 // Re-export workflow classes
 export { DocumentProcessingWorkflow, BatchProcessingWorkflow } from './workflow';
 
+// Export handler with proper types
 export default {
   fetch: app.fetch,
-  queue: processQueueBatch,
+  async queue(batch: MessageBatch<DocumentMessage>, env: Bindings): Promise<void> {
+    console.log(`QUEUE HANDLER: Received ${batch.messages.length} messages`);
+    for (const message of batch.messages) {
+      try {
+        console.log(`Processing: ${JSON.stringify(message.body).slice(0, 100)}`);
+        message.ack();
+      } catch (e) {
+        console.error('Message error:', e);
+        message.retry();
+      }
+    }
+  },
 };

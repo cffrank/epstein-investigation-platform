@@ -220,7 +220,7 @@ def update_document_r2_key(conn, doc_id: str, r2_key: str, content_hash: str, fi
             SET r2_key = %s,
                 content_hash = COALESCE(content_hash, %s),
                 metadata = COALESCE(metadata, '{}'::jsonb) || %s::jsonb,
-                updated_at = NOW()
+                processed_at = NOW()
             WHERE id = %s
         """, (r2_key, content_hash, json.dumps(metadata_update), doc_id))
 
@@ -234,7 +234,7 @@ def mark_document_upload_error(conn, doc_id: str, error: str):
             UPDATE documents
             SET metadata = COALESCE(metadata, '{}'::jsonb) ||
                            jsonb_build_object('r2_upload_error', %s, 'r2_worker_id', %s),
-                updated_at = NOW()
+                processed_at = NOW()
             WHERE id = %s
         """, (error, WORKER_ID, doc_id))
         conn.commit()
@@ -247,7 +247,7 @@ def mark_document_file_not_found(conn, doc_id: str):
             UPDATE documents
             SET metadata = COALESCE(metadata, '{}'::jsonb) ||
                            jsonb_build_object('file_not_found', true, 'r2_worker_id', %s),
-                updated_at = NOW()
+                processed_at = NOW()
             WHERE id = %s
         """, (WORKER_ID, doc_id))
         conn.commit()

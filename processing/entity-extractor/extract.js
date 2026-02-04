@@ -104,7 +104,7 @@ async function claimDocuments(limit) {
       )
       UPDATE documents d
       SET metadata = COALESCE(d.metadata, '{}'::jsonb) ||
-                     jsonb_build_object('entity_extraction_started', NOW()::text, 'entity_worker_id', $2)
+                     jsonb_build_object('entity_extraction_started', NOW()::text, 'entity_worker_id', $2::text)
       FROM claimed c
       WHERE d.id = c.id
       RETURNING d.id, d.filename, d.source, d.metadata
@@ -186,9 +186,9 @@ async function updateDocumentSuccess(docId, entityCounts) {
                      'entities_extracted', true,
                      'entity_counts', $1::jsonb,
                      'entity_extraction_completed', NOW()::text,
-                     'entity_worker_id', $2
+                     'entity_worker_id', $2::text
                    ),
-        updated_at = NOW()
+        processed_at = NOW()
     WHERE id = $3
   `, [JSON.stringify(entityCounts), config.workerId, docId]);
 }
@@ -200,8 +200,8 @@ async function markDocumentError(docId, error) {
   await pgPool.query(`
     UPDATE documents
     SET metadata = COALESCE(metadata, '{}'::jsonb) ||
-                   jsonb_build_object('entity_error', $1, 'entity_worker_id', $2),
-        updated_at = NOW()
+                   jsonb_build_object('entity_error', $1::text, 'entity_worker_id', $2::text),
+        processed_at = NOW()
     WHERE id = $3
   `, [error, config.workerId, docId]);
 }

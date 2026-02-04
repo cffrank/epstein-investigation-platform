@@ -296,7 +296,7 @@ def update_document_text(conn, doc_id: str, text: str, file_hash: Optional[str] 
             UPDATE documents
             SET metadata = COALESCE(metadata, '{}'::jsonb) || %s::jsonb,
                 search_vector = to_tsvector('english', %s),
-                updated_at = NOW()
+                processed_at = NOW()
             WHERE id = %s
         """, (json.dumps(metadata_update), text[:100000], doc_id))  # Limit search vector source
 
@@ -321,7 +321,7 @@ def mark_document_needs_ocr(conn, doc_id: str, image_info: Optional[Dict] = None
         cur.execute("""
             UPDATE documents
             SET metadata = COALESCE(metadata, '{}'::jsonb) || %s::jsonb,
-                updated_at = NOW()
+                processed_at = NOW()
             WHERE id = %s
         """, (json.dumps(metadata_update), doc_id))
         conn.commit()
@@ -334,7 +334,7 @@ def mark_document_error(conn, doc_id: str, error: str):
             UPDATE documents
             SET metadata = COALESCE(metadata, '{}'::jsonb) ||
                            jsonb_build_object('extraction_error', %s, 'worker_id', %s),
-                updated_at = NOW()
+                processed_at = NOW()
             WHERE id = %s
         """, (error, WORKER_ID, doc_id))
         conn.commit()
@@ -347,7 +347,7 @@ def mark_document_file_not_found(conn, doc_id: str):
             UPDATE documents
             SET metadata = COALESCE(metadata, '{}'::jsonb) ||
                            jsonb_build_object('file_not_found', true, 'worker_id', %s),
-                updated_at = NOW()
+                processed_at = NOW()
             WHERE id = %s
         """, (WORKER_ID, doc_id))
         conn.commit()

@@ -69,7 +69,7 @@ check_compose_files() {
 }
 
 docker_compose() {
-    docker-compose -f "$COMPOSE_FILE" -f "$PROCESSING_COMPOSE" "$@"
+    docker compose -f "$COMPOSE_FILE" -f "$PROCESSING_COMPOSE" "$@"
 }
 
 start_services() {

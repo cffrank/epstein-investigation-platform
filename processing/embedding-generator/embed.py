@@ -212,7 +212,7 @@ def update_document_embedding_status(conn, doc_id: str, status: str, qdrant_poin
             UPDATE documents
             SET embedding_status = %s,
                 metadata = COALESCE(metadata, '{}'::jsonb) || %s::jsonb,
-                updated_at = NOW()
+                processed_at = NOW()
             WHERE id = %s
         """, (status, json.dumps(metadata_update), doc_id))
 
@@ -227,7 +227,7 @@ def mark_document_embedding_error(conn, doc_id: str, error: str):
             SET embedding_status = 'error',
                 metadata = COALESCE(metadata, '{}'::jsonb) ||
                            jsonb_build_object('embedding_error', %s, 'embed_worker_id', %s),
-                updated_at = NOW()
+                processed_at = NOW()
             WHERE id = %s
         """, (error, WORKER_ID, doc_id))
         conn.commit()

@@ -182,7 +182,7 @@ services:
 
   # ===================
   # EMBEDDING GENERATOR
-  # Generates embeddings via Cloudflare Workers AI REST API
+  # Generates embeddings via Cloudflare Worker API (uses internal AI binding)
   # Rate limited to 600 requests/min
   # ===================
   embedding-generator:
@@ -200,9 +200,10 @@ services:
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
       QDRANT_API_KEY: ${QDRANT_API_KEY}
-      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID}
-      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
       BATCH_SIZE: 10
+      EMBEDDING_BATCH_SIZE: 20
       REQUESTS_PER_MINUTE: 300
       WORKER_ID: 1
     networks:
@@ -230,9 +231,10 @@ services:
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
       QDRANT_API_KEY: ${QDRANT_API_KEY}
-      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID}
-      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
       BATCH_SIZE: 10
+      EMBEDDING_BATCH_SIZE: 20
       REQUESTS_PER_MINUTE: 300
       WORKER_ID: 2
     networks:

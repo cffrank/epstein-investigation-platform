@@ -33,16 +33,17 @@ QDRANT_PORT = int(os.environ.get('QDRANT_PORT', 6333))
 QDRANT_API_KEY = os.environ.get('QDRANT_API_KEY', '')
 QDRANT_COLLECTION = os.environ.get('QDRANT_COLLECTION', 'document_embeddings')
 
-CLOUDFLARE_ACCOUNT_ID = os.environ.get('CLOUDFLARE_ACCOUNT_ID', '')
-CLOUDFLARE_API_TOKEN = os.environ.get('CLOUDFLARE_API_TOKEN', '')
+# Cloudflare Worker API for embeddings (uses internal AI binding)
+WORKER_URL = os.environ.get('WORKER_URL', 'https://epstein-api.carl-f-frank.workers.dev')
+API_SECRET_KEY = os.environ.get('API_SECRET_KEY', '')
 
 BATCH_SIZE = int(os.environ.get('BATCH_SIZE', 10))
+EMBEDDING_BATCH_SIZE = int(os.environ.get('EMBEDDING_BATCH_SIZE', 20))  # Texts per embedding request
 REQUESTS_PER_MINUTE = int(os.environ.get('REQUESTS_PER_MINUTE', 300))
 WORKER_ID = os.environ.get('WORKER_ID', '1')
 
 # BGE-base-en-v1.5 produces 768-dimensional vectors
 EMBEDDING_DIMENSION = 768
-MODEL_ID = '@cf/baai/bge-base-en-v1.5'
 
 # Logging setup
 logging.basicConfig(
@@ -109,24 +110,25 @@ def ensure_collection(qdrant_client: QdrantClient):
 
 def generate_embedding(text: str, rate_limiter: RateLimiter) -> Tuple[Optional[List[float]], Optional[str]]:
     """
-    Generate embedding using Cloudflare Workers AI REST API.
+    Generate embedding via Cloudflare Worker's /ai/embedding endpoint.
+    The Worker uses its internal AI binding which has proper authentication.
     Returns (embedding_vector, error_message).
     """
     rate_limiter.wait()
 
-    url = f"https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}/ai/run/{MODEL_ID}"
+    url = f"{WORKER_URL}/ai/embedding"
 
     headers = {
-        'Authorization': f'Bearer {CLOUDFLARE_API_TOKEN}',
+        'X-API-Key': API_SECRET_KEY,
         'Content-Type': 'application/json'
     }
 
     # Truncate text to fit model context (BGE has ~512 token limit)
-    # Approximate 4 chars per token, so ~2000 chars
+    # Worker also truncates to 8000 chars, but we limit to 2000 for safety
     truncated_text = text[:2000] if len(text) > 2000 else text
 
     payload = {
-        'text': [truncated_text]
+        'text': truncated_text
     }
 
     try:
@@ -138,25 +140,78 @@ def generate_embedding(text: str, rate_limiter: RateLimiter) -> Tuple[Optional[L
             time.sleep(60)
             return None, "rate_limited"
 
+        if response.status_code == 401:
+            return None, "Unauthorized - check API_SECRET_KEY"
+
         if response.status_code != 200:
             return None, f"API error {response.status_code}: {response.text}"
 
         result = response.json()
 
-        if not result.get('success'):
-            errors = result.get('errors', [])
-            return None, f"API error: {errors}"
+        # Extract embedding from Worker response format
+        embedding = result.get('embedding')
+        if not embedding:
+            return None, f"No embedding in response: {result}"
 
-        # Extract embedding from response
-        data = result.get('result', {}).get('data', [])
-        if not data or len(data) == 0:
-            return None, "No embedding in response"
-
-        embedding = data[0]
         if len(embedding) != EMBEDDING_DIMENSION:
             return None, f"Wrong embedding dimension: {len(embedding)}"
 
         return embedding, None
+
+    except requests.exceptions.Timeout:
+        return None, "timeout"
+    except Exception as e:
+        return None, str(e)
+
+
+def generate_embeddings_batch(texts: List[str], rate_limiter: RateLimiter) -> Tuple[Optional[List[List[float]]], Optional[str]]:
+    """
+    Generate embeddings for multiple texts in a single request.
+    Uses the Worker's /ai/embeddings-batch endpoint for efficiency.
+    Returns (list_of_embeddings, error_message).
+    """
+    rate_limiter.wait()
+
+    url = f"{WORKER_URL}/ai/embeddings-batch"
+
+    headers = {
+        'X-API-Key': API_SECRET_KEY,
+        'Content-Type': 'application/json'
+    }
+
+    # Truncate each text
+    truncated_texts = [t[:2000] if len(t) > 2000 else t for t in texts]
+
+    payload = {
+        'texts': truncated_texts
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=60)
+
+        if response.status_code == 429:
+            logger.warning("Rate limited, waiting 60s...")
+            time.sleep(60)
+            return None, "rate_limited"
+
+        if response.status_code == 401:
+            return None, "Unauthorized - check API_SECRET_KEY"
+
+        if response.status_code != 200:
+            return None, f"API error {response.status_code}: {response.text}"
+
+        result = response.json()
+
+        embeddings = result.get('embeddings')
+        if not embeddings:
+            return None, f"No embeddings in response: {result}"
+
+        # Verify dimensions
+        for i, emb in enumerate(embeddings):
+            if len(emb) != EMBEDDING_DIMENSION:
+                return None, f"Wrong embedding dimension at index {i}: {len(emb)}"
+
+        return embeddings, None
 
     except requests.exceptions.Timeout:
         return None, "timeout"
@@ -335,11 +390,12 @@ def get_stats(conn) -> dict:
 def main():
     """Main processing loop."""
     logger.info(f"Starting Embedding Generator Worker {WORKER_ID}")
+    logger.info(f"Worker URL: {WORKER_URL}")
     logger.info(f"Batch size: {BATCH_SIZE}")
     logger.info(f"Rate limit: {REQUESTS_PER_MINUTE} requests/min")
 
-    if not CLOUDFLARE_ACCOUNT_ID or not CLOUDFLARE_API_TOKEN:
-        logger.error("Cloudflare credentials not configured")
+    if not API_SECRET_KEY:
+        logger.error("API_SECRET_KEY not configured - required for Worker API authentication")
         sys.exit(1)
 
     conn = get_db_connection()

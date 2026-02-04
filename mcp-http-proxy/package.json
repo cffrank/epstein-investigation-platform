@@ -1,0 +1,14 @@
+{
+  "name": "mcp-http-proxy",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "hono": "^4.0.0",
+    "@hono/node-server": "^1.8.0",
+    "pg": "^8.11.0"
+  }
+}

@@ -29,6 +29,7 @@ All services run via Docker Compose at `/opt/app/docker-compose.yml`. Network: `
 | Container | Port | Purpose |
 |-----------|------|---------|
 | nginx | 8080 | **Reverse Proxy** - Routes traffic to OpenClaw gateway and API |
+| mcp-http-proxy | 3002 | **MCP HTTP Proxy** - Database access for Claude Code via HTTP |
 | cloudflared | - | **Tunnel** - Exposes services via Cloudflare Zero Trust tunnel |
 | prometheus | 9090 | **Metrics** - Collects metrics from all services |
 | grafana | 3001 | **Dashboards** - Visualization and alerting |
@@ -344,6 +345,35 @@ Located at `config/nginx/conf.d/default.conf`:
 | `/*` | 404 JSON | - | Default fallback |
 
 Rate limits: 10 requests/second with burst of 20, max 20 connections per IP.
+
+## MCP HTTP Proxy API
+
+Accessible at `https://epstein-api.allfrontoffice.com/mcp/` for Claude Code database access.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/mcp/health` | Health check |
+| GET | `/mcp/tools` | List available tools |
+| POST | `/mcp/tools/query` | Execute SELECT query: `{"sql": "SELECT ..."}` |
+| POST | `/mcp/tools/get_schema` | Get table schema: `{"table": "documents"}` |
+| POST | `/mcp/tools/list_tables` | List all tables with sizes |
+| POST | `/mcp/tools/get_stats` | Get document processing statistics |
+
+**Example usage:**
+```bash
+# Get stats
+curl -X POST https://epstein-api.allfrontoffice.com/mcp/tools/get_stats
+
+# Run a query
+curl -X POST https://epstein-api.allfrontoffice.com/mcp/tools/query \
+  -H "Content-Type: application/json" \
+  -d '{"sql": "SELECT COUNT(*) FROM documents"}'
+
+# Get table schema
+curl -X POST https://epstein-api.allfrontoffice.com/mcp/tools/get_schema \
+  -H "Content-Type: application/json" \
+  -d '{"table": "documents"}'
+```
 
 ## Cloudflare Worker API Endpoints
 

@@ -234,3 +234,30 @@ services:
     networks:
       - app_network
     pid: host
+
+  # ===================
+  # MCP HTTP PROXY (Database access for Claude Code)
+  # ===================
+  mcp-http-proxy:
+    build:
+      context: ./mcp-http-proxy
+      dockerfile: Dockerfile
+    container_name: mcp-http-proxy
+    restart: unless-stopped
+    environment:
+      PORT: 3002
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    networks:
+      - app_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

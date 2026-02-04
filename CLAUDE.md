@@ -114,7 +114,7 @@ Via Cloudflare Tunnel:
 ## Key Database Tables
 
 ### PostgreSQL (`platform` database)
-- `documents` - 964,883 documents (main document store)
+- `documents` - ~961K documents (main document store)
 - `investigation_notes` - Investigation notes by subject
 - `source_credibility` - Source credibility ratings
 - `allegation_tags` - Document allegation tags
@@ -124,6 +124,48 @@ Via Cloudflare Tunnel:
 SELECT source, COUNT(*) as total,
   COUNT(CASE WHEN search_vector IS NOT NULL THEN 1 END) as indexed
 FROM documents GROUP BY source ORDER BY total DESC;
+```
+
+## Document Deduplication
+
+### How It Works
+- Each document has a `content_hash` (MD5 of file content)
+- Unique constraint prevents duplicate hashes: `idx_documents_content_hash_unique`
+- Datasets tracked via `source` column (e.g., `dataset_9`, `dataset_10`)
+
+### Import Function
+Use `import_document()` to safely import with dedup check:
+```sql
+SELECT * FROM import_document(
+  'filename.pdf',      -- filename
+  'new_dataset',       -- source
+  'abc123hash...',     -- content_hash (MD5)
+  'dataset/file.pdf',  -- r2_key
+  'Court Filing',      -- doc_type (optional)
+  12345,               -- file_size_bytes (optional)
+  '{"key": "value"}'   -- metadata JSONB (optional)
+);
+
+-- Returns: doc_id UUID, status TEXT ('inserted' or 'duplicate')
+```
+
+### Import Workflow
+1. Compute MD5 hash of file before upload
+2. Call `import_document()` with hash
+3. If status = 'duplicate': skip R2 upload, use existing doc_id
+4. If status = 'inserted': upload to R2, queue for processing
+
+### Check for Duplicates
+```sql
+-- Find documents with same content across datasets
+SELECT content_hash, array_agg(DISTINCT source) as sources, COUNT(*)
+FROM documents
+WHERE content_hash IS NOT NULL
+GROUP BY content_hash
+HAVING COUNT(*) > 1;
+
+-- Check if a hash already exists
+SELECT id, filename, source FROM documents WHERE content_hash = 'your_hash';
 ```
 
 ## Cloudflare Worker
@@ -166,7 +208,7 @@ ssh root@88.99.61.233 'source /opt/app/.env && docker exec neo4j cypher-shell -u
 ## Processing Pipeline Status
 
 As of last check:
-- **Total Documents:** 964,883
+- **Total Documents:** 961,433
 - **Text Extracted:** 905,738 (94%)
 - **Search Indexed:** 71,061 (7%)
 - **Qdrant Embeddings:** 66,947 (7%)
@@ -177,9 +219,15 @@ Large datasets needing processing:
 - `dataset_11`: 329K docs (10% complete)
 - `dataset_10`: 141K docs (4% complete)
 
+Metadata-only datasets (JSON, no PDFs):
+- `epstein-docs`: 8,186 docs (summaries, key_people, doc classifications)
+- `epstein-docs-fulltext`: 1,743 docs (full_text extracts, entities)
+
 ## Notes
 
 - PostgreSQL port 5432 is NOT exposed publicly (127.0.0.1 only)
 - All external access goes through Cloudflare Tunnel → nginx
 - OpenClaw uses Anthropic Claude Opus 4.5 as the agent model
 - MCP servers run inside OpenClaw container using stdio transport
+- `combined_all` dataset was deleted (redundant, all files existed in dataset_1-8)
+- Duplicate detection uses `content_hash` column with unique constraint

@@ -1,0 +1,306 @@
+version: '3.8'
+
+# Document Processing Pipeline - Separate compose file for processing containers
+# Run with: docker-compose -f docker-compose.yml -f docker-compose.processing.yml up -d
+
+networks:
+  app_network:
+    external: true
+    name: app_app_network
+
+services:
+  # ===================
+  # TEXT EXTRACTOR
+  # Extracts text from PDFs using pdftotext, stores in PostgreSQL
+  # ===================
+  text-extractor:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor
+    restart: unless-stopped
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      WORKER_ID: 1
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-2:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-2
+    restart: unless-stopped
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      WORKER_ID: 2
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-3:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-3
+    restart: unless-stopped
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      WORKER_ID: 3
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-4:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-4
+    restart: unless-stopped
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      WORKER_ID: 4
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  # ===================
+  # R2 UPLOADER
+  # Uploads PDFs to Cloudflare R2 with verification
+  # DOES NOT delete local files - safe mode only
+  # ===================
+  r2-uploader:
+    build:
+      context: ./processing/r2-uploader
+      dockerfile: Dockerfile
+    container_name: r2-uploader
+    restart: unless-stopped
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET: ${R2_BUCKET:-epstein-documents}
+      BATCH_SIZE: 50
+      WORKER_ID: 1
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  r2-uploader-2:
+    build:
+      context: ./processing/r2-uploader
+      dockerfile: Dockerfile
+    container_name: r2-uploader-2
+    restart: unless-stopped
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET: ${R2_BUCKET:-epstein-documents}
+      BATCH_SIZE: 50
+      WORKER_ID: 2
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # ===================
+  # EMBEDDING GENERATOR
+  # Generates embeddings via Cloudflare Workers AI REST API
+  # Rate limited to 600 requests/min
+  # ===================
+  embedding-generator:
+    build:
+      context: ./processing/embedding-generator
+      dockerfile: Dockerfile
+    container_name: embedding-generator
+    restart: unless-stopped
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+      BATCH_SIZE: 10
+      REQUESTS_PER_MINUTE: 300
+      WORKER_ID: 1
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+      - qdrant
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  embedding-generator-2:
+    build:
+      context: ./processing/embedding-generator
+      dockerfile: Dockerfile
+    container_name: embedding-generator-2
+    restart: unless-stopped
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
+      BATCH_SIZE: 10
+      REQUESTS_PER_MINUTE: 300
+      WORKER_ID: 2
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+      - qdrant
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # ===================
+  # ENTITY EXTRACTOR
+  # Extracts entities (People, Orgs, Locations) and stores in Neo4j
+  # ===================
+  entity-extractor:
+    build:
+      context: ./processing/entity-extractor
+      dockerfile: Dockerfile
+    container_name: entity-extractor
+    restart: unless-stopped
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      NEO4J_HOST: neo4j
+      NEO4J_BOLT_PORT: 7687
+      NEO4J_USER: ${NEO4J_USER}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      BATCH_SIZE: 50
+      WORKER_ID: 1
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+      - neo4j
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  entity-extractor-2:
+    build:
+      context: ./processing/entity-extractor
+      dockerfile: Dockerfile
+    container_name: entity-extractor-2
+    restart: unless-stopped
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      NEO4J_HOST: neo4j
+      NEO4J_BOLT_PORT: 7687
+      NEO4J_USER: ${NEO4J_USER}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      BATCH_SIZE: 50
+      WORKER_ID: 2
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+      - neo4j
+    deploy:
+      resources:
+        limits:
+          memory: 2G

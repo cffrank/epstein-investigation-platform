@@ -114,11 +114,11 @@ app.post('/tools/:name', async (c) => {
         const result = await pool.query(`
           SELECT
             COUNT(*) as total_documents,
-            COUNT(CASE WHEN text_content IS NOT NULL THEN 1 END) as with_text,
             COUNT(CASE WHEN search_vector IS NOT NULL THEN 1 END) as indexed,
             COUNT(CASE WHEN embedding_status = 'completed' THEN 1 END) as with_embeddings,
             COUNT(CASE WHEN embedding_status = 'pending' THEN 1 END) as pending_embeddings,
             COUNT(CASE WHEN embedding_status = 'failed' THEN 1 END) as failed_embeddings,
+            COUNT(CASE WHEN ocr_status = 'completed' THEN 1 END) as ocr_completed,
             COUNT(DISTINCT source) as sources
           FROM documents
         `);

@@ -174,23 +174,35 @@ def claim_documents(conn, limit: int) -> list:
     """
     Claim documents for R2 upload using FOR UPDATE SKIP LOCKED.
     Returns list of document records.
+
+    Handles two cases:
+    1. Documents with no r2_key - need to upload
+    2. Documents with r2_key but not verified - need to verify/upload if missing
     """
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        # Find documents that:
+        # Find documents that need R2 upload or verification:
         # - Have a filename
-        # - Don't have an r2_key yet OR r2_key needs verification
-        # - Have a content_hash (from text extraction) OR we need to compute it
-        # - Not marked as file_not_found
+        # - Either no r2_key OR r2_key exists but not verified
+        # - Not marked as file_not_found or upload error
+        # - Prioritize 2026 datasets (have files on disk)
         cur.execute("""
             WITH claimed AS (
                 SELECT id, filename, source, r2_key, content_hash, metadata
                 FROM documents
                 WHERE filename IS NOT NULL
                   AND filename LIKE '%%.pdf'
-                  AND (r2_key IS NULL OR r2_key = '')
+                  AND (
+                      (r2_key IS NULL OR r2_key = '')
+                      OR (r2_key IS NOT NULL AND r2_key != '' AND (metadata IS NULL OR metadata->>'r2_verified' IS NULL))
+                  )
                   AND (metadata IS NULL OR metadata->>'file_not_found' IS NULL)
                   AND (metadata IS NULL OR metadata->>'r2_upload_error' IS NULL)
-                ORDER BY created_at ASC
+                ORDER BY
+                    CASE
+                        WHEN source IN ('dataset_10', 'dataset_9', 'dataset_11', 'dataset_12') THEN 0
+                        ELSE 1
+                    END,
+                    created_at ASC
                 LIMIT %s
                 FOR UPDATE SKIP LOCKED
             )
@@ -207,12 +219,13 @@ def claim_documents(conn, limit: int) -> list:
 
 
 def update_document_r2_key(conn, doc_id: str, r2_key: str, content_hash: str, file_size: int):
-    """Update document with R2 key after successful upload."""
+    """Update document with R2 key after successful upload or verification."""
     with conn.cursor() as cur:
         metadata_update = {
             'r2_upload_completed': time.strftime('%Y-%m-%dT%H:%M:%SZ'),
             'r2_worker_id': WORKER_ID,
-            'r2_file_size': file_size
+            'r2_file_size': file_size,
+            'r2_verified': True  # Mark as verified in R2
         }
 
         cur.execute("""
@@ -317,6 +330,7 @@ def get_stats(conn) -> dict:
             SELECT
                 COUNT(*) as total,
                 COUNT(CASE WHEN r2_key IS NOT NULL AND r2_key != '' THEN 1 END) as has_r2_key,
+                COUNT(CASE WHEN metadata->>'r2_verified' = 'true' THEN 1 END) as r2_verified,
                 COUNT(CASE WHEN metadata->>'r2_upload_error' IS NOT NULL THEN 1 END) as upload_errors,
                 COUNT(CASE WHEN metadata->>'file_not_found' = 'true' THEN 1 END) as not_found
             FROM documents

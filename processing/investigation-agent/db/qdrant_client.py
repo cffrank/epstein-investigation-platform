@@ -3,6 +3,7 @@
 import logging
 from typing import List, Dict, Optional
 
+import requests as http_requests
 from qdrant_client import QdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue
 
@@ -75,12 +76,20 @@ class QdrantSearchClient:
             return []
 
     def get_collection_info(self) -> Dict:
-        """Get collection statistics."""
-        info = self.client.get_collection(self.collection)
+        """Get collection statistics via raw HTTP (avoids client version mismatch)."""
+        headers = {}
+        if QDRANT_API_KEY:
+            headers['api-key'] = QDRANT_API_KEY
+        resp = http_requests.get(
+            f"http://{QDRANT_HOST}:{QDRANT_PORT}/collections/{self.collection}",
+            headers=headers, timeout=10
+        )
+        resp.raise_for_status()
+        result = resp.json().get('result', {})
         return {
-            'points_count': info.points_count,
-            'indexed_vectors_count': info.indexed_vectors_count,
-            'segments_count': info.segments_count,
+            'points_count': result.get('points_count', 0),
+            'indexed_vectors_count': result.get('indexed_vectors_count', 0),
+            'segments_count': result.get('segments_count', 0),
         }
 
     def close(self):

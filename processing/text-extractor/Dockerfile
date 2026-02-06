@@ -12,6 +12,6 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY extract.py .
+COPY extract.py file_index.py ./
 
 CMD ["python", "-u", "extract.py"]

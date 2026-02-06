@@ -1,11 +1,10 @@
-FROM node:20-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install dependencies
-COPY package.json .
-RUN npm install
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY extract.js .
+COPY extract.py .
 
-CMD ["node", "extract.js"]
+CMD ["python", "extract.py"]

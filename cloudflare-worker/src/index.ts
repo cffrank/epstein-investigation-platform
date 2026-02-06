@@ -321,15 +321,15 @@ app.post('/ai/generate', async (c) => {
     }
 
     const body = await c.req.json();
-    const { prompt, system, max_tokens = 2048 } = body;
+    const { prompt, system, max_tokens = 2048, model = '@cf/meta/llama-3-8b-instruct' } = body;
 
     if (!prompt || typeof prompt !== 'string') {
       return c.json({ error: 'Prompt string required' }, 400);
     }
 
-    // Use Llama 3 for entity extraction
+    // Use specified Workers AI model (default: Llama 3 8B)
     const response = await c.env.AI.run(
-      '@cf/meta/llama-3-8b-instruct',
+      model as any,
       {
         messages: [
           { role: 'system', content: system || 'You are a helpful assistant.' },
@@ -349,7 +349,7 @@ app.post('/ai/generate', async (c) => {
 
     return c.json({
       text: response.response,
-      model: '@cf/meta/llama-3-8b-instruct',
+      model,
     });
   } catch (error) {
     console.error('Text generation error:', error);

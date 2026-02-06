@@ -19,6 +19,10 @@ services:
       dockerfile: Dockerfile
     container_name: text-extractor
     restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     environment:
       PG_HOST: postgres
       PG_PORT: 5432
@@ -26,9 +30,19 @@ services:
       PG_USER: ${POSTGRES_USER}
       PG_PASSWORD: ${POSTGRES_PASSWORD}
       BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
       WORKER_ID: 1
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
     volumes:
       - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
     networks:
       - app_network
     depends_on:
@@ -45,6 +59,10 @@ services:
       dockerfile: Dockerfile
     container_name: text-extractor-2
     restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     environment:
       PG_HOST: postgres
       PG_PORT: 5432
@@ -52,9 +70,19 @@ services:
       PG_USER: ${POSTGRES_USER}
       PG_PASSWORD: ${POSTGRES_PASSWORD}
       BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
       WORKER_ID: 2
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
     volumes:
       - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
     networks:
       - app_network
     depends_on:
@@ -71,6 +99,10 @@ services:
       dockerfile: Dockerfile
     container_name: text-extractor-3
     restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     environment:
       PG_HOST: postgres
       PG_PORT: 5432
@@ -78,9 +110,19 @@ services:
       PG_USER: ${POSTGRES_USER}
       PG_PASSWORD: ${POSTGRES_PASSWORD}
       BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
       WORKER_ID: 3
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
     volumes:
       - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
     networks:
       - app_network
     depends_on:
@@ -97,6 +139,10 @@ services:
       dockerfile: Dockerfile
     container_name: text-extractor-4
     restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     environment:
       PG_HOST: postgres
       PG_PORT: 5432
@@ -104,9 +150,819 @@ services:
       PG_USER: ${POSTGRES_USER}
       PG_PASSWORD: ${POSTGRES_PASSWORD}
       BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
       WORKER_ID: 4
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
     volumes:
       - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-5:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-5
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 5
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-6:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-6
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 6
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-7:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-7
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 7
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-8:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-8
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 8
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-9:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-9
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 9
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-10:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-10
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 10
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-11:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-11
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 11
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-12:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-12
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 12
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-13:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-13
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 13
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-14:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-14
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 14
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-15:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-15
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 15
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-16:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-16
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 16
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-17:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-17
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 17
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-18:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-18
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 18
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-19:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-19
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 19
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-20:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-20
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 20
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-21:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-21
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 21
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-22:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-22
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 22
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-23:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-23
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 23
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+
+  text-extractor-24:
+    build:
+      context: ./processing/text-extractor
+      dockerfile: Dockerfile
+    container_name: text-extractor-24
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      BATCH_SIZE: 100
+      PARALLEL_DOWNLOADS: 10
+      WORKER_ID: 24
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      ENABLE_R2_FETCH: "true"
+      ENABLE_HETZNER_FETCH: "true"
+      HETZNER_S3_ENDPOINT: ${HETZNER_S3_ENDPOINT}
+      HETZNER_S3_ACCESS_KEY: ${HETZNER_S3_ACCESS_KEY}
+      HETZNER_S3_SECRET_KEY: ${HETZNER_S3_SECRET_KEY}
+      HETZNER_S3_BUCKET: ${HETZNER_S3_BUCKET:-epstein-documents}
+    volumes:
+      - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
     networks:
       - app_network
     depends_on:
@@ -142,6 +998,7 @@ services:
       WORKER_ID: 1
     volumes:
       - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
     networks:
       - app_network
     depends_on:
@@ -171,6 +1028,7 @@ services:
       WORKER_ID: 2
     volumes:
       - /opt/app/data/epstein-files:/data:ro
+      - /opt/app/downloads:/downloads:ro
     networks:
       - app_network
     depends_on:
@@ -182,8 +1040,8 @@ services:
 
   # ===================
   # EMBEDDING GENERATOR
-  # Generates embeddings via Cloudflare Worker API (uses internal AI binding)
-  # Rate limited to 600 requests/min
+  # Generates embeddings via OpenAI text-embedding-3-small (1536 dimensions)
+  # Uses chunking for long documents, batch API for efficiency
   # ===================
   embedding-generator:
     build:
@@ -200,11 +1058,14 @@ services:
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
       QDRANT_API_KEY: ${QDRANT_API_KEY}
-      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
-      API_SECRET_KEY: ${API_SECRET_KEY}
-      BATCH_SIZE: 10
-      EMBEDDING_BATCH_SIZE: 20
-      REQUESTS_PER_MINUTE: 300
+      QDRANT_COLLECTION: document_embeddings_v2
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: text-embedding-3-small
+      BATCH_SIZE: 50
+      CHUNK_SIZE: 6000
+      CHUNK_OVERLAP: 500
+      MAX_CHUNKS_PER_DOC: 20
+      REQUESTS_PER_MINUTE: 5000
       WORKER_ID: 1
     networks:
       - app_network
@@ -231,11 +1092,14 @@ services:
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
       QDRANT_API_KEY: ${QDRANT_API_KEY}
-      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
-      API_SECRET_KEY: ${API_SECRET_KEY}
-      BATCH_SIZE: 10
-      EMBEDDING_BATCH_SIZE: 20
-      REQUESTS_PER_MINUTE: 300
+      QDRANT_COLLECTION: document_embeddings_v2
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: text-embedding-3-small
+      BATCH_SIZE: 50
+      CHUNK_SIZE: 6000
+      CHUNK_OVERLAP: 500
+      MAX_CHUNKS_PER_DOC: 20
+      REQUESTS_PER_MINUTE: 5000
       WORKER_ID: 2
     networks:
       - app_network
@@ -249,7 +1113,8 @@ services:
 
   # ===================
   # ENTITY EXTRACTOR
-  # Extracts entities (People, Orgs, Locations) and stores in Neo4j
+  # Extracts entities (People, Orgs, Locations) using Cerebras LLM
+  # Stores relationships in Neo4j graph database
   # ===================
   entity-extractor:
     build:
@@ -267,7 +1132,11 @@ services:
       NEO4J_BOLT_PORT: 7687
       NEO4J_USER: ${NEO4J_USER}
       NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      CEREBRAS_API_KEY: ${CEREBRAS_API_KEY}
+      CEREBRAS_MODEL: llama3.1-8b
       BATCH_SIZE: 50
+      MAX_TEXT_LENGTH: 4000
+      REQUESTS_PER_MINUTE: 1000
       WORKER_ID: 1
     networks:
       - app_network
@@ -277,7 +1146,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 1G
 
   entity-extractor-2:
     build:
@@ -295,7 +1164,11 @@ services:
       NEO4J_BOLT_PORT: 7687
       NEO4J_USER: ${NEO4J_USER}
       NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      CEREBRAS_API_KEY: ${CEREBRAS_API_KEY}
+      CEREBRAS_MODEL: llama3.1-8b
       BATCH_SIZE: 50
+      MAX_TEXT_LENGTH: 4000
+      REQUESTS_PER_MINUTE: 1000
       WORKER_ID: 2
     networks:
       - app_network
@@ -305,4 +1178,50 @@ services:
     deploy:
       resources:
         limits:
+          memory: 1G
+
+  # ===================
+  # INVESTIGATION AGENT
+  # Autonomous investigation of the document corpus
+  # Uses tiered AI: Workers AI (bulk) / Sonnet (reasoning) / Opus (deep)
+  # Run with: docker compose -f docker-compose.processing.yml run -it investigation-agent
+  # ===================
+  investigation-agent:
+    build:
+      context: ./processing/investigation-agent
+      dockerfile: Dockerfile
+    container_name: investigation-agent
+    restart: "no"
+    stdin_open: true
+    tty: true
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
+      QDRANT_COLLECTION: document_embeddings_v2
+      NEO4J_HOST: neo4j
+      NEO4J_BOLT_PORT: 7687
+      NEO4J_USER: ${NEO4J_USER}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      WORKERS_AI_URL: https://epstein-api.carl-f-frank.workers.dev
+      WORKERS_AI_API_KEY: ${API_SECRET_KEY:-test-api-key-12345}
+      WORKERS_AI_MODEL: "@cf/meta/llama-4-scout-17b-16e-instruct"
+      CLAUDE_SONNET_MODEL: "claude-sonnet-4-20250514"
+      CLAUDE_OPUS_MODEL: "claude-opus-4-20250514"
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+      - qdrant
+      - neo4j
+    deploy:
+      resources:
+        limits:
           memory: 2G
+          cpus: "2"

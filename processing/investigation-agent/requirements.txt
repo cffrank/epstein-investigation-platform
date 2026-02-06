@@ -1,0 +1,5 @@
+psycopg2-binary==2.9.9
+neo4j==5.17.0
+requests==2.31.0
+qdrant-client==1.7.3
+anthropic==0.39.0

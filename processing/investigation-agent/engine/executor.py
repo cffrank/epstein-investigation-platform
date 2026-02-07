@@ -110,6 +110,10 @@ class Executor:
             query = ctx.get('search_query', self.inv.target.get('query', ''))
             return self.unified.search_documents(query)
 
+        elif action == 'search_vlm':
+            query = ctx.get('search_query', self.inv.target.get('query', self.inv.target.get('name', '')))
+            return {'vlm_documents': self.unified.pg.search_vlm_results(query, 50)}
+
         elif action == 'get_co_mentioned':
             name = ctx.get('target_name', self.inv.target.get('name', ''))
             return {'co_mentioned': self.unified.neo4j.co_mentioned_entities(name)}

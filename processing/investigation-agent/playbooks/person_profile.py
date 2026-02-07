@@ -31,6 +31,12 @@ class PersonProfilePlaybook(Playbook):
                 description="Check for existing investigation notes"
             ),
             Step(
+                name=f"VLM visual analysis: {name}",
+                action='search_vlm',
+                tier='bulk',
+                description=f"Search VLM-extracted OCR text and people descriptions for '{name}'"
+            ),
+            Step(
                 name="Co-mentioned entities",
                 action='get_co_mentioned',
                 tier='bulk',

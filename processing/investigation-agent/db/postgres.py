@@ -88,10 +88,41 @@ class PostgresClient:
             LIMIT %s
         """, (name, name, limit))
 
+    def search_vlm_results(self, query: str, limit: int = 50) -> List[Dict]:
+        """Search documents that have VLM analysis results."""
+        return self._execute("""
+            SELECT id, filename, source,
+                   metadata->'vlm_results' as vlm_results,
+                   metadata->>'vlm_status' as vlm_status
+            FROM documents
+            WHERE metadata->>'vlm_status' = 'completed'
+              AND metadata->'vlm_results' IS NOT NULL
+              AND (
+                  metadata->'vlm_results'->>'extracted_text' ILIKE %s
+                  OR metadata->'vlm_results'->>'people_description' ILIKE %s
+                  OR metadata->'vlm_results'->>'context' ILIKE %s
+              )
+            LIMIT %s
+        """, (f'%{query}%', f'%{query}%', f'%{query}%', limit))
+
+    def get_vlm_stats(self) -> Dict:
+        """Get VLM processing statistics."""
+        rows = self._execute("""
+            SELECT
+                COUNT(CASE WHEN metadata->>'vlm_status' = 'completed' THEN 1 END) as vlm_completed,
+                COUNT(CASE WHEN metadata->>'vlm_status' = 'pending' THEN 1 END) as vlm_pending,
+                COUNT(CASE WHEN metadata->>'vlm_status' = 'failed' THEN 1 END) as vlm_failed,
+                COUNT(CASE WHEN metadata->'vlm_results' IS NOT NULL THEN 1 END) as has_vlm_results
+            FROM documents
+            WHERE metadata->>'vlm_status' IS NOT NULL
+        """)
+        return dict(rows[0]) if rows else {}
+
     def get_investigation_notes(self, subject: str) -> List[Dict]:
         """Get existing investigation notes for a subject."""
         return self._execute("""
-            SELECT id, subject, content, classification, source_documents, created_at
+            SELECT id, subject, summary, allegation_type, corroborating_docs,
+                   confidence_level, created_at
             FROM investigation_notes
             WHERE subject ILIKE %s
             ORDER BY created_at DESC
@@ -236,13 +267,13 @@ class PostgresClient:
             ORDER BY confidence DESC, created_at ASC
         """, (investigation_id,))
 
-    def insert_investigation_note(self, subject: str, content: str, classification: str,
+    def insert_investigation_note(self, subject: str, summary: str, allegation_type: str = None,
                                    source_docs: List[str] = None):
         """Insert a note into the investigation_notes table."""
         self._execute("""
-            INSERT INTO investigation_notes (subject, content, classification, source_documents)
+            INSERT INTO investigation_notes (subject, summary, allegation_type, corroborating_docs)
             VALUES (%s, %s, %s, %s)
-        """, (subject, content, classification, json.dumps(source_docs or [])), fetch=False)
+        """, (subject, summary, allegation_type, source_docs or []), fetch=False)
 
     def close(self):
         self.conn.close()

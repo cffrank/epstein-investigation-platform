@@ -25,6 +25,12 @@ class DocumentTriagePlaybook(Playbook):
                 description=f"Combined semantic + fulltext search for '{query}'"
             ),
             Step(
+                name=f"VLM analysis search: {query}",
+                action='search_vlm',
+                tier='bulk',
+                description=f"Search VLM-extracted OCR text and visual descriptions for '{query}'"
+            ),
+            Step(
                 name="Classify relevance",
                 action='classify_relevance',
                 tier='bulk',

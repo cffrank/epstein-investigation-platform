@@ -285,9 +285,18 @@ def cmd_stats(unified: UnifiedSearch):
         if label != 'error':
             print(f"  {label}: {count:,}")
 
-    print(f"\nQdrant ({PLAYBOOK_REGISTRY and 'v2' or ''}):")
-    print(f"  Points: {qdrant.get('points_count', '?'):,}")
-    print(f"  Indexed: {qdrant.get('indexed_vectors_count', '?'):,}")
+    print(f"\nQdrant Collections:")
+    for key in ['v2', 'v1', 'vlm']:
+        info = qdrant.get(key, {})
+        if info.get('error'):
+            print(f"  {key}: ERROR - {info['error']}")
+        else:
+            coll = info.get('collection', key)
+            pts = info.get('points_count', '?')
+            idx = info.get('indexed_vectors_count', '?')
+            pts_str = f"{pts:,}" if isinstance(pts, int) else str(pts)
+            idx_str = f"{idx:,}" if isinstance(idx, int) else str(idx)
+            print(f"  {coll}: {pts_str} points ({idx_str} indexed)")
     print()
 
 

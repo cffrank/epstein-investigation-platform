@@ -66,15 +66,20 @@ class UnifiedSearch:
 
     def search_documents(self, query: str, embedding_vector: List[float] = None,
                           limit: int = 30) -> Dict:
-        """Combined semantic + fulltext search, merged and re-ranked."""
-        results = {'fulltext': [], 'semantic': []}
+        """Combined semantic (v2 + VLM) + fulltext search, merged and re-ranked."""
+        results = {'fulltext': [], 'semantic_v2': [], 'semantic_vlm': []}
 
-        with ThreadPoolExecutor(max_workers=2) as executor:
+        with ThreadPoolExecutor(max_workers=3) as executor:
             futures = {
                 executor.submit(self.pg.search_fulltext, query, limit): 'fulltext',
             }
             if embedding_vector:
-                futures[executor.submit(self.qdrant.search_by_vector, embedding_vector, limit)] = 'semantic'
+                futures[executor.submit(
+                    self.qdrant.search_by_vector, embedding_vector, limit, None, self.qdrant.collection_v2
+                )] = 'semantic_v2'
+                futures[executor.submit(
+                    self.qdrant.search_by_vector, embedding_vector, limit, None, self.qdrant.collection_vlm
+                )] = 'semantic_vlm'
 
             for future in as_completed(futures):
                 key = futures[future]
@@ -86,11 +91,17 @@ class UnifiedSearch:
         # Merge and deduplicate by document_id
         seen_ids = set()
         merged = []
-        for doc in results['semantic']:
+        for doc in results['semantic_v2']:
             doc_id = doc.get('document_id')
             if doc_id and doc_id not in seen_ids:
                 seen_ids.add(doc_id)
-                merged.append({**doc, 'search_type': 'semantic'})
+                merged.append({**doc, 'search_type': 'semantic_v2'})
+
+        for doc in results['semantic_vlm']:
+            doc_id = doc.get('document_id')
+            if doc_id and doc_id not in seen_ids:
+                seen_ids.add(doc_id)
+                merged.append({**doc, 'search_type': 'semantic_vlm'})
 
         for doc in results['fulltext']:
             doc_id = str(doc.get('id', ''))
@@ -115,14 +126,14 @@ class UnifiedSearch:
         }
 
     def get_platform_stats(self) -> Dict:
-        """Get statistics from all three databases."""
+        """Get statistics from all databases including all Qdrant collections."""
         stats = {}
 
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = {
                 executor.submit(self.pg.get_document_stats): 'postgres',
                 executor.submit(self.neo4j.get_entity_stats): 'neo4j_entities',
-                executor.submit(self.qdrant.get_collection_info): 'qdrant',
+                executor.submit(self.qdrant.get_all_collections_info): 'qdrant',
             }
             for future in as_completed(futures):
                 key = futures[future]

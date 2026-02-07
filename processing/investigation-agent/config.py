@@ -14,6 +14,8 @@ QDRANT_HOST = os.environ.get('QDRANT_HOST', 'qdrant')
 QDRANT_PORT = int(os.environ.get('QDRANT_PORT', 6333))
 QDRANT_API_KEY = os.environ.get('QDRANT_API_KEY', '')
 QDRANT_COLLECTION = os.environ.get('QDRANT_COLLECTION', 'document_embeddings_v2')
+QDRANT_COLLECTION_V1 = os.environ.get('QDRANT_COLLECTION_V1', 'document_embeddings')
+QDRANT_COLLECTION_VLM = os.environ.get('QDRANT_COLLECTION_VLM', 'vlm_analysis')
 
 # Neo4j
 NEO4J_HOST = os.environ.get('NEO4J_HOST', 'neo4j')
@@ -30,6 +32,14 @@ CLAUDE_OPUS_MODEL = os.environ.get('CLAUDE_OPUS_MODEL', 'claude-opus-4-20250514'
 WORKERS_AI_URL = os.environ.get('WORKERS_AI_URL', 'https://epstein-api.carl-f-frank.workers.dev')
 WORKERS_AI_API_KEY = os.environ.get('WORKERS_AI_API_KEY', 'test-api-key-12345')
 WORKERS_AI_MODEL = os.environ.get('WORKERS_AI_MODEL', '@cf/meta/llama-4-scout-17b-16e-instruct')
+
+# Hetzner Object Storage (S3-compatible)
+S3_ENDPOINT = os.environ.get('HETZNER_S3_ENDPOINT', '')
+S3_ACCESS_KEY = os.environ.get('HETZNER_S3_ACCESS_KEY', '')
+S3_SECRET_KEY = os.environ.get('HETZNER_S3_SECRET_KEY', '')
+S3_BUCKET = os.environ.get('HETZNER_S3_BUCKET', 'epstein-documents')
+S3_REGION = os.environ.get('HETZNER_S3_REGION', 'fsn1')
+S3_REPORTS_PREFIX = os.environ.get('S3_REPORTS_PREFIX', 'reports/')
 
 # Behavior
 MAX_STEPS = int(os.environ.get('MAX_STEPS', 50))

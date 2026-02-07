@@ -1,14 +1,60 @@
-"""Report generation for investigations."""
+"""Report generation for investigations. Saves locally and uploads to S3."""
 
 import os
 import json
 import logging
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 
-from config import REPORT_DIR
+from config import (
+    REPORT_DIR, S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY,
+    S3_BUCKET, S3_REGION, S3_REPORTS_PREFIX
+)
 
 logger = logging.getLogger(__name__)
+
+_s3_client = None
+
+
+def _get_s3_client():
+    """Lazy-init S3 client for Hetzner Object Storage."""
+    global _s3_client
+    if _s3_client is not None:
+        return _s3_client
+    if not S3_ENDPOINT or not S3_ACCESS_KEY:
+        return None
+    import boto3
+    from botocore.config import Config
+    _s3_client = boto3.client(
+        's3',
+        endpoint_url=S3_ENDPOINT,
+        aws_access_key_id=S3_ACCESS_KEY,
+        aws_secret_access_key=S3_SECRET_KEY,
+        region_name=S3_REGION,
+        config=Config(signature_version='s3v4')
+    )
+    return _s3_client
+
+
+def upload_to_s3(content: str, s3_key: str, content_type: str = 'text/markdown') -> Optional[str]:
+    """Upload report content to S3. Returns S3 URL or None on failure."""
+    client = _get_s3_client()
+    if not client:
+        logger.debug("S3 not configured, skipping upload")
+        return None
+    try:
+        client.put_object(
+            Bucket=S3_BUCKET,
+            Key=s3_key,
+            Body=content.encode('utf-8'),
+            ContentType=content_type
+        )
+        url = f"{S3_ENDPOINT}/{S3_BUCKET}/{s3_key}"
+        logger.info(f"Report uploaded to S3: {s3_key}")
+        return url
+    except Exception as e:
+        logger.warning(f"S3 upload failed: {e}")
+        return None
 
 
 def generate_markdown_report(investigation: Dict, findings: List[Dict],
@@ -109,7 +155,8 @@ def generate_markdown_report(investigation: Dict, findings: List[Dict],
 
 
 def save_report(investigation_id: str, content: str, fmt: str = 'md') -> str:
-    """Save report to filesystem. Returns file path."""
+    """Save report locally and upload to S3. Returns local file path."""
+    # Save locally
     report_dir = os.path.join(REPORT_DIR, investigation_id)
     os.makedirs(report_dir, exist_ok=True)
 
@@ -121,6 +168,14 @@ def save_report(investigation_id: str, content: str, fmt: str = 'md') -> str:
         f.write(content)
 
     logger.info(f"Report saved: {filepath}")
+
+    # Upload to S3
+    content_type = 'text/markdown' if fmt == 'md' else 'application/json'
+    s3_key = f"{S3_REPORTS_PREFIX}{investigation_id}/{filename}"
+    s3_url = upload_to_s3(content, s3_key, content_type)
+    if s3_url:
+        logger.info(f"Report uploaded: {s3_url}")
+
     return filepath
 
 
@@ -137,3 +192,9 @@ def generate_json_report(investigation: Dict, findings: List[Dict]) -> Dict:
         'findings': findings,
         'model_usage': investigation.get('model_usage', {}),
     }
+
+
+def save_json_report(investigation_id: str, report: Dict) -> str:
+    """Save JSON report locally and upload to S3."""
+    content = json.dumps(report, indent=2, default=str)
+    return save_report(investigation_id, content, fmt='json')

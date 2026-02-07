@@ -153,19 +153,46 @@ class Executor:
             return {'classified': classified}
 
         elif action == 'analyze_patterns':
-            summaries = ctx.get(f'step_{self._prev_step_index()}_result', {}).get('summaries', [])
-            topic = ctx.get('search_query', self.inv.target.get('name', ''))
-            summaries_text = '\n\n'.join(f"Doc {i+1}: {s}" for i, s in enumerate(summaries[:30]))
+            summaries = self._find_in_context('summaries') or []
+            topic = ctx.get('search_query', self.inv.target.get('query', self.inv.target.get('name', '')))
+
+            # Build rich context from summaries + classified docs
+            parts = []
+            if summaries:
+                parts.append(f"## Document Summaries ({len(summaries)} documents)")
+                for i, s in enumerate(summaries[:30]):
+                    if s and not s.startswith('[Failed'):
+                        parts.append(f"\n### Document {i+1}\n{s}")
+
+            classified = self._find_in_context('classified') or []
+            if classified:
+                parts.append(f"\n## Classification Results ({len(classified)} documents)")
+                for item in classified[:20]:
+                    doc = item.get('doc', {})
+                    fname = doc.get('filename', 'unknown')
+                    cls_text = item.get('classification', '')
+                    parts.append(f"- **{fname}**: {cls_text}")
+
+            context_text = '\n'.join(parts) if parts else "No document summaries available."
+
             result = self.llm.reason(
-                "You are an investigative analyst. Identify patterns across documents.",
-                f"Analyze these {len(summaries)} document summaries about \"{topic}\":\n\n{summaries_text}\n\n"
-                "Identify: 1) Recurring patterns 2) Contradictions 3) Key claims with multiple sources 4) Evidence gaps"
+                "You are an investigative analyst examining documents from the Epstein investigation. "
+                "Analyze the provided document summaries and identify concrete, specific patterns. "
+                "Reference specific documents by number. Be factual and evidence-based.",
+                f"## Investigation Topic: \"{topic}\"\n\n"
+                f"{context_text}\n\n"
+                "## Your Analysis\n"
+                "Based on the documents above, provide:\n"
+                "1. **Key Patterns**: Recurring themes with specific document references\n"
+                "2. **Important Claims**: Factual claims that appear in multiple documents\n"
+                "3. **Contradictions**: Conflicting information between documents\n"
+                "4. **Evidence Gaps**: What's missing or needs further investigation\n"
+                "5. **Most Significant Documents**: Which documents are most important and why"
             )
             return {'analysis': result}
 
         elif action == 'analyze_connections':
-            prev = ctx.get(f'step_{self._prev_step_index()}_result', {})
-            connections = prev.get('connections', prev.get('co_mentioned', []))
+            connections = self._find_in_context('connections') or self._find_in_context('co_mentioned') or []
             name = ctx.get('target_name', self.inv.target.get('name', ''))
             conn_text = '\n'.join(f"- {c.get('name', 'unknown')} ({c.get('type', '?')}): "
                                   f"{c.get('shared_docs', c.get('co_mentions', 0))} shared docs"
@@ -217,16 +244,9 @@ class Executor:
             }
 
         elif action == 'extract_findings':
-            # Parse LLM analysis output and store as findings
-            analysis = None
-            for j in range(len(self.inv.steps) - 1, -1, -1):
-                prev_result = ctx.get(f'step_{j}_result', {})
-                if isinstance(prev_result, dict) and prev_result.get('analysis'):
-                    analysis = prev_result['analysis']
-                    break
-
+            analysis = self._find_in_context('analysis')
             if analysis:
-                self._extract_and_store_findings(analysis, step.tier)
+                self._extract_findings_with_llm(analysis, step.tier)
             return {'findings_extracted': self.findings.count}
 
         else:
@@ -234,15 +254,31 @@ class Executor:
             return {'warning': f'Unknown action: {action}'}
 
     def _get_docs_from_context(self):
-        """Extract document list from previous step results."""
+        """Extract and merge document lists from ALL search step results."""
+        seen_ids = set()
+        merged = []
+        for j in range(len(self.inv.steps)):
+            result = self.context.get(f'step_{j}_result', {})
+            if not isinstance(result, dict):
+                continue
+            docs = result.get('documents', result.get('merged', []))
+            if not docs:
+                # Also check vlm_documents
+                docs = result.get('vlm_documents', [])
+            for doc in docs:
+                doc_id = str(doc.get('document_id', doc.get('id', '')))
+                if doc_id and doc_id not in seen_ids:
+                    seen_ids.add(doc_id)
+                    merged.append(doc)
+        return merged
+
+    def _find_in_context(self, key: str):
+        """Search backwards through step results for a specific key."""
         for j in range(len(self.inv.steps) - 1, -1, -1):
             result = self.context.get(f'step_{j}_result', {})
-            if isinstance(result, dict):
-                if 'documents' in result:
-                    return result['documents']
-                if 'merged' in result:
-                    return result['merged']
-        return []
+            if isinstance(result, dict) and result.get(key):
+                return result[key]
+        return None
 
     def _prev_step_index(self) -> int:
         """Get the index of the most recently completed step."""
@@ -266,9 +302,63 @@ class Executor:
         parts.append(f"Findings so far: {self.findings.count}")
         return '\n'.join(parts)
 
-    def _extract_and_store_findings(self, analysis: str, tier: str):
-        """Parse analysis text and store individual findings."""
-        # Simple heuristic: split on numbered items or bullet points
+    def _extract_findings_with_llm(self, analysis: str, tier: str):
+        """Use Sonnet to extract structured findings from analysis text."""
+        extraction = self.llm.reason(
+            "You extract structured findings from investigative analysis. "
+            "Return ONLY findings in the exact format specified. No preamble.",
+            f"Extract the key findings from this analysis. For each finding, output EXACTLY this format "
+            f"(one finding per block, separated by blank lines):\n\n"
+            f"FINDING: [short title, max 10 words]\n"
+            f"TYPE: [one of: pattern, connection, anomaly, claim, evidence_gap]\n"
+            f"CONFIDENCE: [HIGH, MEDIUM, or LOW]\n"
+            f"DESCRIPTION: [2-3 sentence description with specific evidence]\n"
+            f"ENTITIES: [comma-separated list of people/orgs mentioned, or NONE]\n\n"
+            f"---\n\nAnalysis to extract from:\n\n{analysis[:6000]}"
+        )
+
+        if not extraction:
+            # Fallback to naive extraction
+            self._extract_and_store_findings_naive(analysis, tier)
+            return
+
+        # Parse structured output
+        blocks = extraction.split('\n\n')
+        for block in blocks:
+            lines_map = {}
+            for line in block.strip().split('\n'):
+                if ':' in line:
+                    key, _, val = line.partition(':')
+                    lines_map[key.strip().upper()] = val.strip()
+
+            title = lines_map.get('FINDING', '')
+            if not title or len(title) < 5:
+                continue
+
+            conf_str = lines_map.get('CONFIDENCE', 'MEDIUM').upper()
+            confidence = 0.85 if conf_str == 'HIGH' else 0.7 if conf_str == 'MEDIUM' else 0.5
+
+            finding_type = lines_map.get('TYPE', 'pattern').lower().replace(' ', '_')
+            valid_types = ('connection', 'pattern', 'anomaly', 'document', 'entity',
+                          'timeline_event', 'contradiction', 'corroboration', 'claim', 'evidence_gap')
+            if finding_type not in valid_types:
+                finding_type = 'pattern'
+
+            entities_str = lines_map.get('ENTITIES', '')
+            entities = [e.strip() for e in entities_str.split(',')
+                       if e.strip() and e.strip().upper() != 'NONE'] if entities_str else []
+
+            self.findings.add(
+                finding_type=finding_type,
+                title=title[:200],
+                description=lines_map.get('DESCRIPTION', title),
+                confidence=confidence,
+                model_source='sonnet',
+                entities=entities,
+            )
+
+    def _extract_and_store_findings_naive(self, analysis: str, tier: str):
+        """Fallback: parse analysis text with simple heuristics."""
         lines = analysis.split('\n')
         current_finding = []
         for line in lines:
@@ -279,7 +369,6 @@ class Executor:
                 current_finding = [stripped]
             elif current_finding:
                 current_finding.append(stripped)
-
         if current_finding:
             self._store_parsed_finding(current_finding, tier)
 
@@ -288,15 +377,12 @@ class Executor:
         text = ' '.join(lines).strip()
         if len(text) < 20:
             return
-        # Use first line as title, rest as description
         title = lines[0][:200].lstrip('0123456789.-*) ')
-        description = text
-
         model = 'workers_ai' if tier == 'bulk' else 'sonnet' if tier == 'reasoning' else 'opus'
         self.findings.add(
             finding_type='pattern',
             title=title,
-            description=description,
+            description=text,
             confidence=0.5 if tier == 'bulk' else 0.7 if tier == 'reasoning' else 0.85,
             model_source=model,
         )

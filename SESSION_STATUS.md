@@ -1,98 +1,94 @@
 # Epstein Platform - Session Status
-**Date:** 2026-02-13 (Session ended ~21:15 CET)
+**Date:** 2026-02-13 (Session ended ~22:25 CET)
 
 ## What Was Done This Session
 
-### Downloads Completed
-1. **DOJ Datasets 9, 10, 11** - Torrents, extracted, media uploaded to S3, imported to PostgreSQL
-2. **Internet Archive full collection** (USAvJeffreyEpstein) - 65 GB, 80 ZIPs
-3. **House Oversight Google Drive** - 76 GB (41 IMAGES ZIPs + DATA/NATIVES/TEXT ZIPs + Giuffre PDF)
-4. **Internet Archive OCR collection** (epstein-pdf) - 13 GB, 67K OCR'd PDFs
-5. **House Oversight estate-first** - Dropbox ZIP
-6. **FBI Vault FOIA** - 44 files, 78 MB
-7. **Filthy Rich.pdf** - Book, 280 pages
+### 1. Multi-Agent Processing System Created
+Created 5 new agent files in `agents/`:
+- `ingestion-agent.md` - PostgreSQL import with dedup, S3 upload
+- `text-extraction-agent.md` - Text extraction worker management
+- `ocr-agent.md` - Cloudflare VLM OCR processing
+- `monitor-agent.md` - Cross-system health and progress reporting
+- `coordinator.md` - Pipeline playbook (PostgreSQL -> S3 -> Text -> Qdrant -> Neo4j)
 
-### Processing Completed
-1. **Text extraction fix** - Fixed null byte PostgreSQL error + infinite retry loop
-2. **Text extraction** - 16 parallel workers extracted ~29K documents (97% success)
-3. **GDrive processing** - 22,640 images ingested with pre-extracted text from TEXT ZIP, uploaded to S3
-4. **IA OCR ingestion** - 33,572 files via process_all_downloads.py
-5. **Media file import** - 861 media files (videos/audio) from DS10/DS11
-6. **nginx body size limit** - Increased from 20M to 200M
+Existing agents unchanged: `qdrant-transformer.md`, `neo4j-transformer.md`, `openai-optimizer.md`, `investigation-agent.md`
 
-### Scripts Created/Modified
-- `processing/extract_court_records.py` - Removed source filter, fixed null bytes, fixed error handler
-- `processing/process_all_downloads.py` - 5-phase server processing script
-- `processing/process_gdrive_local.py` - GDrive ZIP processing with text matching
+### 2. Monitor Agent Tested
+Dispatched monitor-agent via Task tool, got full status report. All checks worked.
 
-## Current State of All 4 Databases
+### 3. Nginx Healthcheck Fixed
+- **Problem**: `wget` in `nginx:alpine` resolved `localhost` to `::1` (IPv6), but nginx only listens on IPv4. Failing streak: 523.
+- **Fix**: Changed healthcheck URL from `http://localhost/health` to `http://127.0.0.1/health` in `docker-compose.yml` line 95.
+- **Deployed**: scp'd to server, recreated container. Now healthy.
 
-### 1. PostgreSQL - Document Metadata & Text
-| Status | Count |
-|--------|-------|
-| **completed** | 1,442,221 |
-| **pending** | 20,208 |
-| **needs_ocr** | 11,361 |
-| **error** | 1,234 |
-| **processing** | 188 |
-| **TOTAL** | ~1,475,212 |
+### 4. nginx client_max_body_size Synced
+- Local `config/nginx/nginx.conf` was still `20M`, server had `200M`. Updated local to `200M`.
 
-### 2. Hetzner S3 - File Storage
-All 1,475,212 documents uploaded. Zero docs missing r2_key.
+### 5. Entity Extraction Errors Investigated & Fixed
+- **Root cause**: 22,694 transient Cerebras API failures (JSON parse errors from `llama3.1-8b`, 500/502/504 server errors, timeouts). All docs have valid text.
+- **Cleaned up**:
+  - 7,539 docs with inconsistent state (both error + success) → cleared error marker
+  - 15,155 docs with error only → reset for retry
+  - 1 neo4j connection error → reset
+  - Error count: 22,695 → 0
+- **Restarted entity extractors**: `entity-extractor` and `entity-extractor-2` now running (using `llama3.1-8b`, batch size 50)
 
-### 3. Qdrant - Vector Embeddings
-- **91,768 points** / 1,442,221 completed = **6.2% coverage**
-- Collection: `document_embeddings` (768d BGE-base-en-v1.5)
-- `embed.py` running since Feb 06 but slow
+### 6. Commits Pushed
+- `950f686` - Add multi-agent processing system and fix nginx healthcheck
+- `e550c41` - Add OCR endpoint, MCP server configs, and processing scripts
+- `a20b392` - Add session status tracking document
+- `da6fa84` - Fix coordinator pipeline to sequential flow
 
-### 4. Neo4j - Knowledge Graph
-| Entity Type | Count |
-|-------------|-------|
-| Document | 566,608 (38.5% coverage) |
-| Person | 216,579 |
-| Organization | 127,581 |
-| Location | 72,753 |
+## Current State
 
-~876K documents still need entity extraction.
+### Pipeline Progress
+| Stage | Done | Total | % |
+|-------|------|-------|---|
+| PostgreSQL import | 1,475,212 | 1,475,212 | 100% |
+| S3 upload | 1,475,212 | 1,475,212 | 100% |
+| Text extraction | 1,442,221 | 1,475,212 | 97.8% |
+| OCR (VLM) | 43,811 | 43,811 | 100% |
+| Qdrant V2 embed | 1,373,011 | 1,376,134 | 99.8% |
+| Neo4j entities | 1,300,093 | ~1,390,512 | 93.5% |
 
-## Running Processes on Server
+### Running Processes
 | Process | Status |
 |---------|--------|
-| `embed.py` | Running since Feb 06 (V1 BGE embeddings) |
-| `cloudflare_ocr.py` | Running since Feb 07 (2 workers, continuous) |
-| Docker containers (16) | All running (nginx unhealthy - needs check) |
+| `entity-extractor` | Running (started this session, worker 1) |
+| `entity-extractor-2` | Running (started this session, worker 2) |
+| `embedding-generator` | Running since Feb 06 (up 7 days) |
+| `cloudflare_ocr.py` | Not running (OCR 100% complete) |
+| Text extraction workers | Not running (97.8% complete) |
+| Docker containers (18) | All running, all healthy (nginx fixed) |
 
-No text extraction workers running - they completed and exited.
+### Entity Extraction Status
+- Previously done: 1,300,093
+- Errors: 0 (all cleaned up)
+- Ready for retry: 15,156 (previously failed)
+- Remaining pending: ~76,041
+- Total to process: ~90,419
+- Workers: 2 containers running with `llama3.1-8b` via Cerebras
+- Note: Consider switching model to `llama-4-scout-17b-16e-instruct` for better JSON compliance
 
-## Server Disk
-- **Available:** 127 GB (66% used)
-- **Cleanable:** 76 GB `house-oversight-gdrive/` (done, safe to delete) + 61 MB `_gdrive_extracted/`
+### Docker Container Health
+All 18 containers running and healthy (nginx fixed this session).
+
+### Disk
+- 127 GB free (70% used)
+- Downloads dir: 140 GB (cleanup candidate)
 
 ## Pending Work
 
-### 1. Process IA Full Collection ZIPs (65 GB, 80 ZIPs)
-Location: `/opt/app/data/downloads/ia-full-collection/`
-- Court Records (50 ZIPs, 5.2 GB), EFTA (8 ZIPs, 13 GB), EFTA Modified (7 ZIPs, 39 GB), FOIA (4 ZIPs, 7.5 GB)
-- Need: extract → upload S3 → import PostgreSQL → text extraction
-- Many will be duplicates of already-ingested files
+### Short-term
+1. **Entity extraction running** - 2 workers processing ~90K remaining docs. Monitor for errors.
+2. **20K pending text extraction** - Mostly house-oversight-gdrive images already OCR'd. May need workers restarted.
+3. **V2 embeddings nearly done** - 3,123 eligible docs remaining, plus 6,118 embed errors to investigate.
 
-### 2. OCR / Text Extraction (31,553 docs)
-- 20,192 `house-oversight-gdrive` - JPG/TIF images, no text (need OCR)
-- 10,652 `house-oversight-ocr` - OCR'd PDFs pdf-parse can't handle
-- 709 `epstein-archive` - zero-size files
+### Medium-term
+4. Process IA full collection ZIPs (65 GB, 80 ZIPs on server)
+5. Clean up downloads directory (140 GB recoverable)
+6. Investigate 1,234 text extraction errors (mostly invalid PDF structure)
 
-### 3. Qdrant Embeddings (93.8% remaining)
-- 1,350,453 completed docs need embeddings generated
-- `embed.py` running but very slow - needs scaling or V2 (OpenAI 1536d) migration
-
-### 4. Neo4j Entity Extraction (61.5% remaining)
-- ~876K documents need entity extraction (people, orgs, locations)
-- Pipeline at `/opt/app/processing/entity-extractor/`
-
-### 5. Clean Up Server Disk
-- Delete processed `house-oversight-gdrive/` (76 GB)
-- After IA processing, delete `ia-full-collection/` (65 GB)
-
-### 6. Error Cleanup (1,234 docs)
-- 840 `dataset_10`, 349 `efta-20251231-dataset-8`, 40 `house-oversight`
-- Mostly "Invalid PDF structure" - genuinely problematic files
+### Possible Improvements
+7. Switch entity extractor model from `llama3.1-8b` to `llama-4-scout-17b-16e-instruct` (fewer JSON parse errors)
+8. Add retry logic to entity extractor for transient API failures instead of marking as permanent error

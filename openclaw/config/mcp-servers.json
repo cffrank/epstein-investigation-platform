@@ -2,17 +2,38 @@
   "mcpServers": {
     "postgres": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-postgres"],
-      "env": {
-        "POSTGRES_CONNECTION_STRING": "${DATABASE_URL}"
-      }
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://investigation:kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF@postgres:5432/platform"]
     },
     "qdrant": {
-      "command": "npx",
-      "args": ["-y", "@qdrant/mcp-server"],
+      "command": "/opt/mcp-qdrant-venv/bin/mcp-server-qdrant",
       "env": {
-        "QDRANT_URL": "${QDRANT_URL}",
-        "QDRANT_API_KEY": "${QDRANT_API_KEY}"
+        "QDRANT_URL": "http://qdrant:6333",
+        "QDRANT_API_KEY": "${QDRANT_API_KEY}",
+        "COLLECTION_NAME": "document_embeddings_v2"
+      }
+    },
+    "neo4j": {
+      "command": "/opt/mcp-neo4j-venv/bin/mcp-neo4j-cypher",
+      "env": {
+        "NEO4J_URI": "bolt://neo4j:7687",
+        "NEO4J_USERNAME": "neo4j",
+        "NEO4J_PASSWORD": "${NEO4J_PASSWORD}",
+        "NEO4J_DATABASE": "neo4j",
+        "NEO4J_READ_ONLY": "true"
+      }
+    },
+    "epstein-documents": {
+      "command": "node",
+      "args": ["/opt/mcp-document-search/index.js"],
+      "env": {
+        "DATABASE_URL": "postgresql://investigation:kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF@postgres:5432/platform"
+      }
+    },
+    "epstein-intelligence": {
+      "command": "node",
+      "args": ["/opt/mcp-intelligence/index.js"],
+      "env": {
+        "DATABASE_URL": "postgresql://investigation:kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF@postgres:5432/platform"
       }
     },
     "filesystem": {

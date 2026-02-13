@@ -402,6 +402,80 @@ app.post('/ai/embedding', async (c) => {
   }
 });
 
+// OCR endpoint using Llama 3.2 Vision model
+app.post('/ai/ocr', async (c) => {
+  try {
+    const apiKey = c.req.header('X-API-Key');
+    if (apiKey !== c.env.API_SECRET_KEY) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const body = await c.req.json();
+    const { image, prompt } = body as { image: string; prompt?: string };
+
+    if (!image || typeof image !== 'string') {
+      return c.json({ error: 'Base64 image required' }, 400);
+    }
+
+    const ocrPrompt = prompt || `Extract ALL text from this document image exactly as it appears.
+Instructions:
+- Extract every word, number, date, and character visible
+- Preserve the original formatting as much as possible
+- Include headers, footers, page numbers, and any handwritten notes
+- For tables, preserve the structure using plain text formatting
+- If text is partially visible or unclear, include your best interpretation in [brackets]
+- Do not summarize or interpret - extract exactly what you see
+
+Begin extraction:`;
+
+    // Ensure image is in data URL format
+    const imageUrl = image.startsWith('data:')
+      ? image
+      : `data:image/jpeg;base64,${image}`;
+
+    // Use Llama 3.2 Vision for OCR - use image_url format per docs
+    const response = await c.env.AI.run(
+      '@cf/meta/llama-3.2-11b-vision-instruct' as any,
+      {
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: ocrPrompt,
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: imageUrl,
+                },
+              },
+            ],
+          },
+        ],
+        max_tokens: 4096,
+      },
+      {
+        gateway: {
+          id: 'internal-gateway',
+          headers: {
+            'cf-aig-authorization': `Bearer ${c.env.AI_GATEWAY_TOKEN}`,
+          },
+        },
+      }
+    ) as { response: string };
+
+    return c.json({
+      text: response.response,
+      model: '@cf/meta/llama-3.2-11b-vision-instruct',
+    });
+  } catch (error) {
+    console.error('OCR error:', error);
+    return c.json({ error: 'OCR failed', details: error instanceof Error ? error.message : 'Unknown' }, 500);
+  }
+});
+
 // Batch embeddings endpoint for higher throughput
 app.post('/ai/embeddings-batch', async (c) => {
   try {

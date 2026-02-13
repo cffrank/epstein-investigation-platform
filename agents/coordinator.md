@@ -6,7 +6,7 @@ Reference document for the main Claude Code session on how to dispatch specializ
 
 | Agent | File | Purpose |
 |-------|------|---------|
-| `ingestion-agent` | `agents/ingestion-agent.md` | ZIP extraction, S3 upload, PostgreSQL import with dedup |
+| `ingestion-agent` | `agents/ingestion-agent.md` | PostgreSQL import with dedup, then S3 upload |
 | `text-extraction-agent` | `agents/text-extraction-agent.md` | PDF text extraction worker management |
 | `ocr-agent` | `agents/ocr-agent.md` | VLM-based OCR for image PDFs via Cloudflare |
 | `qdrant-transformer` | `agents/qdrant-transformer.md` | V2 OpenAI embeddings to Qdrant |
@@ -14,21 +14,23 @@ Reference document for the main Claude Code session on how to dispatch specializ
 | `monitor-agent` | `agents/monitor-agent.md` | Cross-system health and progress reporting |
 | `investigation-agent` | `agents/investigation-agent.md` | Investigation queries and analysis |
 
-## Pipeline Dependency Order
+## Pipeline Flow
 
 ```
-Ingest --> Text Extract --> [OCR (if needed)]
-                       |
-                       +--> Embed (Qdrant)
-                       |
-                       +--> Entity Extract (Neo4j)
+1. PostgreSQL  -->  2. S3 Upload  -->  3. Text Extract  -->  4. Qdrant Embed  -->  5. Neo4j Extract
+   (import_document)  (rclone)          (pdf-parse)          (OpenAI 1536d)       (Cerebras LLM)
+                                            |
+                                            +--> [OCR if needed] --+
+                                                 (Cloudflare VLM)  |
+                                                                   v
+                                                            back to step 4
 ```
 
-1. **Ingest** - Documents must be in PostgreSQL + S3 before anything else
-2. **Text Extract** - Depends on ingestion. Produces text for all downstream stages
-3. **OCR** - Only for docs that failed text extraction (marked `needs_ocr`). Feeds back into text pool
-4. **Embed** - Requires text. Can run in parallel with entity extraction
-5. **Entity Extract** - Requires text. Can run in parallel with embedding
+1. **Ingest to PostgreSQL** - `import_document()` with MD5 dedup, creates record
+2. **Upload to S3** - rclone to Hetzner object storage, only if newly inserted
+3. **Text Extract** - Fetch PDF from S3, extract text via API backend, store in `metadata->>'text'`. Docs that fail get marked `needs_ocr` and go through OCR before continuing
+4. **Embed in Qdrant** - Generate OpenAI embeddings (text-embedding-3-small 1536d), upsert to Qdrant V2 collection
+5. **Extract to Neo4j** - Extract people, orgs, locations via Cerebras LLM, store in Neo4j graph
 
 ## Dispatch Patterns
 
@@ -100,58 +102,47 @@ Task tool:
     script and report results (inserted, duplicates, errors).
 ```
 
-## Parallel Dispatch
+## Dispatch Order
 
-Several agents can run simultaneously. Launch these in a single message with multiple Task tool calls:
+The pipeline is **sequential** - each stage depends on the previous one completing:
 
-### Full Pipeline Startup
-Launch all of these in parallel:
-1. **Monitor** - Get current status
-2. **Text Extraction** - Start workers for pending docs
-3. **OCR** - Start workers for needs_ocr docs
-4. **Embedding** - Start workers for docs with text but no embedding
-5. **Entity Extraction** - Start workers for docs with text but no entities
+### New Data Source (Full Pipeline)
+1. **Ingestion Agent** - PostgreSQL import + S3 upload
+2. **Text Extraction Agent** - Extract text from PDFs
+3. **OCR Agent** - Process any `needs_ocr` docs (if any), feeds back into text pool
+4. **Qdrant Transformer** - Generate embeddings for docs with text
+5. **Neo4j Transformer** - Extract entities from docs with text
 
-### Processing + Monitoring
-Launch in parallel:
-1. **Processing agent** (whichever is needed)
-2. **Monitor agent** (background, periodic status)
+### Resume Processing (Mid-Pipeline)
+Check where docs are stuck and start from that stage:
+1. **Monitor Agent** - Get current status to identify the bottleneck
+2. Start the appropriate agent for the earliest incomplete stage
 
-### Post-Ingestion Pipeline
-After ingestion completes, launch in parallel:
-1. **Text Extraction** - Process newly ingested docs
-2. **Monitor** - Track the new batch
-
-## Sequential Dispatch
-
-Some operations must happen in order:
-
-### New Data Source
-1. First: **Ingestion Agent** - Import new documents
-2. Wait for completion
-3. Then parallel: **Text Extraction** + **Monitor**
-4. Wait for text extraction to finish
-5. Then parallel: **Embedding** + **Entity Extraction** + **OCR** (if any needs_ocr)
+### Parallel Opportunities
+Within a single stage, multiple workers can run in parallel. Across stages, only adjacent stages can overlap when the earlier stage has a large enough lead:
+- **Text Extraction** can start while **Ingestion** is still running (for already-ingested docs)
+- **Embedding** can start while **Text Extraction** is still running (for already-extracted docs)
+- **Entity Extraction** can start while **Embedding** is still running (both only need text)
+- Always pair long-running stages with **Monitor Agent** in background
 
 ### Error Recovery
-1. First: **Monitor Agent** - Identify what's broken
-2. Then: Appropriate agent to fix the issue
-3. Then: **Monitor Agent** - Verify the fix
+1. **Monitor Agent** - Identify what's broken
+2. Appropriate pipeline agent to fix the issue
+3. **Monitor Agent** - Verify the fix
 
 ## Decision Guide
 
-| User Request | Agent(s) | Parallel? |
-|-------------|----------|-----------|
+| User Request | Agent | Notes |
+|-------------|-------|-------|
 | "Status report" | monitor-agent | Single |
-| "Start processing" | text-extraction + monitor | Parallel |
-| "Ingest new files" | ingestion-agent | Single, then text-extraction |
-| "Generate embeddings" | qdrant-transformer | Single |
-| "Extract entities" | neo4j-transformer | Single |
-| "Process everything" | All 5 pipeline agents | Parallel |
+| "Ingest new files" | ingestion-agent | Then continue down pipeline |
+| "Start text extraction" | text-extraction-agent | Stage 3 |
+| "Process OCR docs" | ocr-agent | Stage 3b (needs_ocr branch) |
+| "Generate embeddings" | qdrant-transformer | Stage 4, requires text |
+| "Extract entities" | neo4j-transformer | Stage 5, requires text |
+| "Process everything" | Each agent in sequence | Follow pipeline order |
 | "What's running?" | monitor-agent | Single |
-| "Scale up workers" | Appropriate pipeline agent | Single |
 | "Fix errors" | monitor first, then pipeline agent | Sequential |
-| "How many docs need OCR?" | ocr-agent or monitor-agent | Single |
 
 ## Background Agents
 

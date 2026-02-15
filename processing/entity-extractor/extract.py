@@ -177,18 +177,40 @@ def extract_entities_llm(text: str) -> Optional[Dict[str, List[str]]]:
                 'locations': entities.get('locations', [])
             }
         except json.JSONDecodeError:
-            # Fallback: try regex extraction
-            json_match = re.search(r'\{[^{}]*\}', content, re.DOTALL)
-            if json_match:
-                entities = json.loads(json_match.group())
-                return {
-                    'people': entities.get('people', []),
-                    'organizations': entities.get('organizations', []),
-                    'locations': entities.get('locations', [])
-                }
-            else:
-                logger.warning(f"Could not parse JSON from response: {content[:200]}")
-                return None
+            # Fallback: find balanced JSON object
+            depth = 0
+            start = None
+            for i, c in enumerate(content):
+                if c == '{':
+                    if depth == 0:
+                        start = i
+                    depth += 1
+                elif c == '}':
+                    depth -= 1
+                    if depth == 0 and start is not None:
+                        try:
+                            entities = json.loads(content[start:i+1])
+                            if isinstance(entities, dict) and any(k in entities for k in ('people', 'organizations', 'locations')):
+                                return {
+                                    'people': [s for s in entities.get('people', []) if isinstance(s, str)],
+                                    'organizations': [s for s in entities.get('organizations', []) if isinstance(s, str)],
+                                    'locations': [s for s in entities.get('locations', []) if isinstance(s, str)],
+                                }
+                        except json.JSONDecodeError:
+                            start = None
+
+            # Last resort: extract arrays via regex
+            people = re.findall(r'"people"\s*:\s*\[(.*?)\]', content, re.DOTALL)
+            orgs = re.findall(r'"organizations"\s*:\s*\[(.*?)\]', content, re.DOTALL)
+            locs = re.findall(r'"locations"\s*:\s*\[(.*?)\]', content, re.DOTALL)
+            def _extract(matches):
+                return [s.strip() for s in re.findall(r'"([^"]+)"', matches[0])] if matches else []
+            result = {'people': _extract(people), 'organizations': _extract(orgs), 'locations': _extract(locs)}
+            if any(result.values()):
+                return result
+
+            logger.warning(f"Could not parse JSON from response: {content[:200]}")
+            return None
 
     except json.JSONDecodeError as e:
         logger.error(f"JSON parse error: {e}")
@@ -208,8 +230,10 @@ def process_single_doc(doc: dict) -> Tuple[str, str, str, Optional[Dict], str]:
     source = doc['source']
     metadata = doc['metadata'] or {}
 
-    text = metadata.get('text', '')
-    if not text or len(text) < 100:
+    text = metadata.get('text', '') or ''
+    if len(text) < 100:
+        text = metadata.get('extracted_text', '') or ''
+    if len(text) < 100:
         return (doc_id, filename, source, None, "insufficient_text")
 
     entities = extract_entities_llm(text)
@@ -335,8 +359,10 @@ def claim_documents(conn, limit: int) -> list:
             WITH claimed AS (
                 SELECT id, filename, source, metadata
                 FROM documents
-                WHERE metadata->>'text' IS NOT NULL
-                  AND LENGTH(metadata->>'text') > 100
+                WHERE (
+                    (metadata->>'text' IS NOT NULL AND LENGTH(metadata->>'text') > 100)
+                    OR (metadata->>'extracted_text' IS NOT NULL AND LENGTH(metadata->>'extracted_text') > 100)
+                )
                   AND (metadata->>'entities_extracted' IS NULL)
                   AND (metadata->>'entities_error' IS NULL)
                 LIMIT %s
@@ -472,7 +498,7 @@ def get_stats(conn) -> dict:
         cur.execute("""
             SELECT
                 COUNT(*) as total,
-                COUNT(CASE WHEN metadata->>'text' IS NOT NULL THEN 1 END) as has_text,
+                COUNT(CASE WHEN metadata->>'text' IS NOT NULL OR metadata->>'extracted_text' IS NOT NULL THEN 1 END) as has_text,
                 COUNT(CASE WHEN metadata->>'entities_extracted' IS NOT NULL THEN 1 END) as entities_done,
                 COUNT(CASE WHEN metadata->>'entities_error' IS NOT NULL THEN 1 END) as errors
             FROM documents

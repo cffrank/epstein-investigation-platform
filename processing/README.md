@@ -5,10 +5,10 @@ This directory contains Docker containers for the complete document processing p
 ## Architecture
 
 ```
-[Text Extractor]     [R2 Uploader]     [Embedding Generator]     [Entity Extractor]
+[Text Extractor]     [S3 Uploader]     [Embedding Generator]     [Entity Extractor]
       ↓                   ↓                    ↓                       ↓
-  PDF → Text          Local → R2         Text → Vector           Text → Entities
-  (pdftotext)        (S3 API)           (Workers AI)            (NLP/Neo4j)
+  PDF → Text          Local → S3         Text → Vector           Text → Entities
+  (pdf-parse)        (rclone)           (OpenAI API)            (Cerebras/Neo4j)
       ↓                   ↓                    ↓                       ↓
   PostgreSQL         PostgreSQL            Qdrant                  Neo4j
   (metadata.text)    (r2_key)           (embeddings)          (relationships)
@@ -24,20 +24,20 @@ This directory contains Docker containers for the complete document processing p
 - Marks PDFs needing OCR (`needs_ocr = true`)
 - Marks PDFs with photos (`needs_face_detection = true`)
 
-### 2. R2 Upload (`r2-uploader/`)
-- Uploads PDFs to Cloudflare R2
+### 2. S3 Upload (`r2-uploader/`)
+- Uploads PDFs to Hetzner Object Storage (S3-compatible)
 - **SAFE MODE**: Never deletes local files
 - Verifies upload with HEAD request before updating DB
 - Updates `r2_key` in PostgreSQL
 
 ### 3. Embedding Generation (`embedding-generator/`)
-- Generates 768-dim vectors via Cloudflare Workers AI
-- Uses BGE-base-en-v1.5 model
-- Respects rate limits (600 req/min)
-- Stores vectors in Qdrant
+- Generates 1536-dim vectors via OpenAI API
+- Uses text-embedding-3-small model
+- Respects rate limits (5,000 RPM on Tier 2)
+- Stores vectors in Qdrant (`document_embeddings_v2` collection)
 
 ### 4. Entity Extraction (`entity-extractor/`)
-- Extracts People, Organizations, Locations using compromise NLP
+- Extracts People, Organizations, Locations using Cerebras LLM (llama-4-scout-17b)
 - Creates nodes and relationships in Neo4j
 - Links entities to documents via `MENTIONED_IN` relationships
 
@@ -100,15 +100,17 @@ QDRANT_API_KEY=xxx
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=xxx
 
-# Cloudflare R2
-R2_ACCOUNT_ID=xxx
-R2_ACCESS_KEY_ID=xxx
-R2_SECRET_ACCESS_KEY=xxx
-R2_BUCKET=epstein-documents
+# Hetzner Object Storage (S3-compatible)
+HETZNER_S3_ENDPOINT=xxx
+HETZNER_S3_ACCESS_KEY=xxx
+HETZNER_S3_SECRET_KEY=xxx
+HETZNER_S3_BUCKET=epstein-documents
 
-# Cloudflare Workers AI
-CLOUDFLARE_ACCOUNT_ID=xxx
-CLOUDFLARE_API_TOKEN=xxx
+# OpenAI (Embeddings)
+OPENAI_API_KEY=xxx
+
+# Cerebras (Entity Extraction)
+CEREBRAS_API_KEY=xxx
 ```
 
 ## Document Metadata Fields
@@ -127,7 +129,8 @@ After processing, documents will have these metadata fields:
 | `content_hash` | text-extractor | MD5 hash of file |
 | `r2_key` | r2-uploader | R2 object key |
 | `r2_file_size` | r2-uploader | File size in bytes |
-| `qdrant_point_id` | embedding-gen | Qdrant vector ID |
+| `qdrant_point_ids_v2` | embedding-gen | Qdrant vector IDs (V2 collection) |
+| `entities_extracted` | entity-extractor | `true` when entities extracted |
 | `entity_counts` | entity-extractor | {people, orgs, places} counts |
 
 ## Processing Status Fields
@@ -168,12 +171,10 @@ WHERE metadata->>'needs_face_detection' = 'true';
 
 | Stage | Rate | Bottleneck |
 |-------|------|------------|
-| Text Extraction | ~50 docs/sec | CPU (pdftotext) |
-| R2 Upload | ~20 docs/sec | Network bandwidth |
-| Embedding Gen | ~10 docs/sec | Workers AI rate limit (600/min) |
-| Entity Extract | ~100 docs/sec | NLP processing |
-
-Combined pipeline with 4/2/2/2 workers: **~10-15 docs/sec = 36K-54K docs/hour**
+| Text Extraction | ~530 docs/min (16 workers) | S3 download + pdf-parse |
+| S3 Upload | ~1000 docs/min | Network bandwidth |
+| Embedding Gen | ~5,000 RPM (Tier 2) | OpenAI rate limit |
+| Entity Extract | ~300-1,400 docs/min | Cerebras API / Neo4j writes |
 
 ## Atomic Document Claiming
 

@@ -62,7 +62,7 @@ docker compose up -d
 - Organization: `allfrontoffice`
 - Internal IP (via WARP): `192.168.1.100` (requires WARP split tunnel config)
 
-**Services:**
-- App: https://app.epsteinfiles.org
-- API: https://api.epsteinfiles.org
-- Admin: https://admin.epsteinfiles.org
+**Services (via Cloudflare Tunnel):**
+- API: https://epstein-api.allfrontoffice.com
+- Health: https://epstein-api.allfrontoffice.com/health
+- Stats: https://epstein-api.allfrontoffice.com/api/stats

@@ -208,7 +208,7 @@ LIMIT 20;
 ```sql
 SELECT
     COUNT(*) as total,
-    COUNT(CASE WHEN metadata->>'entities_extracted' = 'completed' THEN 1 END) as extracted,
+    COUNT(CASE WHEN metadata->>'entities_extracted' = 'true' THEN 1 END) as extracted,
     COUNT(CASE WHEN metadata->>'entities_error' IS NOT NULL THEN 1 END) as errors
 FROM documents
 WHERE metadata->>'text' IS NOT NULL;
@@ -237,5 +237,5 @@ ssh root@88.99.61.233 'source /opt/app/.env && docker exec neo4j cypher-shell -u
 ssh root@88.99.61.233 'source /opt/app/.env && docker exec neo4j cypher-shell -u neo4j -p "$NEO4J_PASSWORD" "MATCH (p:Person)-[r:MENTIONED_IN]->() RETURN p.name, count(r) as mentions ORDER BY mentions DESC LIMIT 10"'
 
 # Extraction progress
-ssh root@88.99.61.233 'docker exec postgres psql -U investigation -d platform -c "SELECT COUNT(CASE WHEN metadata->>'\\''entities_extracted'\\''='\\''completed'\\'' THEN 1 END) as done, COUNT(*) as total FROM documents WHERE metadata->>'\\''text'\\'' IS NOT NULL"'
+ssh root@88.99.61.233 'docker exec postgres psql -U investigation -d platform -c "SELECT COUNT(CASE WHEN metadata->>'\\''entities_extracted'\\''='\\''true'\\'' THEN 1 END) as done, COUNT(*) as total FROM documents WHERE metadata->>'\\''text'\\'' IS NOT NULL"'
 ```

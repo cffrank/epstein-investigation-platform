@@ -138,7 +138,7 @@ FROM documents;
 ```sql
 -- PostgreSQL side
 SELECT
-  COUNT(*) FILTER (WHERE metadata->>'entities_extracted' = 'completed') as entities_done,
+  COUNT(*) FILTER (WHERE metadata->>'entities_extracted' = 'true') as entities_done,
   COUNT(*) FILTER (WHERE metadata->>'entities_error' IS NOT NULL) as entity_errors,
   COUNT(*) FILTER (WHERE metadata->>'text' IS NOT NULL
     AND metadata->>'entities_extracted' IS NULL

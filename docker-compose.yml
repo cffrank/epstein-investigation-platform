@@ -422,10 +422,14 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+      REDIS_URL: redis://redis:6379/0
     networks:
       - app_network
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3002/health"]

@@ -1,30 +1,37 @@
-import pg from 'pg';
-
-const { Pool } = pg;
-
-let pool: pg.Pool | null = null;
-
-export function getPool(platform: App.Platform): pg.Pool {
-	if (!pool) {
-		pool = new Pool({
-			connectionString: platform.env.HYPERDRIVE.connectionString,
-			max: 5
-		});
-	}
-	return pool;
+interface QueryResponse<T> {
+	rows: T[];
+	rowCount: number;
+	error?: string;
 }
 
-export async function query<T extends pg.QueryResultRow = Record<string, unknown>>(
+export async function query<T = Record<string, unknown>>(
 	platform: App.Platform,
 	sql: string,
 	params?: unknown[]
 ): Promise<T[]> {
-	const p = getPool(platform);
-	const result = await p.query<T>(sql, params);
-	return result.rows;
+	const baseUrl = platform.env.API_BASE_URL;
+	const apiKey = platform.env.API_SECRET_KEY;
+
+	const response = await fetch(`${baseUrl}/mcp/query`, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'X-API-Key': apiKey
+		},
+		body: JSON.stringify({ sql, params: params || [] })
+	});
+
+	if (!response.ok) {
+		const err = await response.json().catch(() => ({ error: response.statusText }));
+		throw new Error((err as { error: string }).error || `DB query failed: ${response.status}`);
+	}
+
+	const data = (await response.json()) as QueryResponse<T>;
+	if (data.error) throw new Error(data.error);
+	return data.rows;
 }
 
-export async function queryOne<T extends pg.QueryResultRow = Record<string, unknown>>(
+export async function queryOne<T = Record<string, unknown>>(
 	platform: App.Platform,
 	sql: string,
 	params?: unknown[]

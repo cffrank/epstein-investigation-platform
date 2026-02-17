@@ -4,16 +4,10 @@
 	"compatibility_date": "2025-01-01",
 	"compatibility_flags": ["nodejs_compat"],
 	"vars": {
+		"API_BASE_URL": "https://epstein-api.allfrontoffice.com",
 		"QDRANT_URL": "http://88.99.61.233:6333",
 		"QDRANT_COLLECTION": "document_embeddings_v2",
 		"NEO4J_URL": "http://88.99.61.233:7474",
-		"R2_BUCKET_URL": "https://epstein-documents.r2.cloudflarestorage.com"
+		"NEO4J_USER": "neo4j"
 	}
-	// Hyperdrive binding - configure in Cloudflare dashboard:
-	// "hyperdrive": [
-	//   {
-	//     "binding": "HYPERDRIVE",
-	//     "id": "<hyperdrive-config-id>"
-	//   }
-	// ]
 }

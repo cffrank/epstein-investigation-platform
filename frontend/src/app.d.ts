@@ -16,7 +16,8 @@ declare global {
 
 		interface Platform {
 			env: {
-				HYPERDRIVE: Hyperdrive;
+				API_BASE_URL: string;
+				API_SECRET_KEY: string;
 				QDRANT_URL: string;
 				QDRANT_API_KEY: string;
 				QDRANT_COLLECTION: string;
@@ -24,16 +25,8 @@ declare global {
 				NEO4J_USER: string;
 				NEO4J_PASSWORD: string;
 				OPENAI_API_KEY: string;
-				R2_BUCKET_URL: string;
-				R2_ACCESS_KEY_ID: string;
-				R2_SECRET_ACCESS_KEY: string;
-				CF_ACCESS_TEAM: string;
 			};
 		}
-	}
-
-	interface Hyperdrive {
-		connectionString: string;
 	}
 }
 

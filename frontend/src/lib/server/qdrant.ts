@@ -11,30 +11,31 @@ interface QdrantSearchResponse {
 }
 
 export function qdrantClient(platform: App.Platform) {
-	const baseUrl = platform.env.QDRANT_URL;
-	const apiKey = platform.env.QDRANT_API_KEY;
+	const baseUrl = platform.env.API_BASE_URL;
+	const apiKey = platform.env.API_SECRET_KEY;
 	const collection = platform.env.QDRANT_COLLECTION;
-
-	const headers: Record<string, string> = {
-		'Content-Type': 'application/json',
-		'api-key': apiKey
-	};
 
 	return {
 		async search(
 			vector: number[],
 			options: { limit?: number; filter?: Record<string, unknown>; with_payload?: boolean }
 		): Promise<QdrantSearchResult[]> {
-			const response = await fetch(`${baseUrl}/collections/${collection}/points/search`, {
-				method: 'POST',
-				headers,
-				body: JSON.stringify({
-					vector,
-					limit: options.limit ?? 10,
-					filter: options.filter,
-					with_payload: options.with_payload ?? true
-				})
-			});
+			const response = await fetch(
+				`${baseUrl}/mcp/qdrant/collections/${collection}/points/search`,
+				{
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'X-API-Key': apiKey
+					},
+					body: JSON.stringify({
+						vector,
+						limit: options.limit ?? 10,
+						filter: options.filter,
+						with_payload: options.with_payload ?? true
+					})
+				}
+			);
 
 			if (!response.ok) {
 				throw new Error(`Qdrant search failed: ${response.status} ${await response.text()}`);
@@ -45,7 +46,9 @@ export function qdrantClient(platform: App.Platform) {
 		},
 
 		async getCollectionInfo() {
-			const response = await fetch(`${baseUrl}/collections/${collection}`, { headers });
+			const response = await fetch(`${baseUrl}/mcp/qdrant/collections/${collection}`, {
+				headers: { 'X-API-Key': apiKey }
+			});
 			if (!response.ok) {
 				throw new Error(`Qdrant collection info failed: ${response.status}`);
 			}

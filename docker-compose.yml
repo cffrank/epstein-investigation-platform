@@ -424,12 +424,21 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       API_SECRET_KEY: ${API_SECRET_KEY}
       REDIS_URL: redis://redis:6379/0
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_API_KEY: ${QDRANT_API_KEY}
+      NEO4J_URL: http://neo4j:7474
+      NEO4J_USER: ${NEO4J_USER}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
     networks:
       - app_network
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      neo4j:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3002/health"]

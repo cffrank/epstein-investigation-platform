@@ -64,7 +64,7 @@ async function fulltextSearch(
 	limit: number,
 	offset: number
 ) {
-	const conditions: string[] = ['search_vector IS NOT NULL'];
+	const conditions: string[] = ["search_vector @@ plainto_tsquery('english', $1)"];
 	const params: unknown[] = [searchQuery];
 	let paramIndex = 2;
 
@@ -185,7 +185,7 @@ async function semanticSearch(
 	});
 
 	// Extract doc IDs and fetch metadata from PostgreSQL
-	const docIds = searchResults.slice(offset, offset + limit).map((r) => r.payload.doc_id as string);
+	const docIds = searchResults.slice(offset, offset + limit).map((r) => (r.payload.document_id || r.payload.doc_id) as string);
 
 	if (docIds.length === 0) {
 		return { results: [], total: searchResults.length };
@@ -239,7 +239,7 @@ async function semanticSearch(
 
 	// Create a map for quick lookup
 	const docMap = new Map(docs.map((d) => [d.id, d]));
-	const scoreMap = new Map(searchResults.map((r) => [r.payload.doc_id, r.score]));
+	const scoreMap = new Map(searchResults.map((r) => [r.payload.document_id || r.payload.doc_id, r.score]));
 
 	const results: SearchResult[] = docIds
 		.map((docId) => {

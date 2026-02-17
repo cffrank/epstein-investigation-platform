@@ -9,22 +9,19 @@ interface Neo4jResponse {
 }
 
 export function neo4jClient(platform: App.Platform) {
-	const baseUrl = platform.env.NEO4J_URL;
-	const user = platform.env.NEO4J_USER;
-	const password = platform.env.NEO4J_PASSWORD;
-
-	const auth = btoa(`${user}:${password}`);
+	const baseUrl = platform.env.API_BASE_URL;
+	const apiKey = platform.env.API_SECRET_KEY;
 
 	return {
 		async query(
 			cypher: string,
 			params: Record<string, unknown> = {}
 		): Promise<{ columns: string[]; rows: unknown[][] }> {
-			const response = await fetch(`${baseUrl}/db/neo4j/tx/commit`, {
+			const response = await fetch(`${baseUrl}/mcp/neo4j/db/neo4j/tx/commit`, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
-					Authorization: `Basic ${auth}`,
+					'X-API-Key': apiKey,
 					Accept: 'application/json'
 				},
 				body: JSON.stringify({

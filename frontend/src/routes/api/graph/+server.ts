@@ -43,7 +43,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 					MATCH (n)
 					WHERE (n:Person OR n:Organization OR n:Location)
 					  AND toLower(n.name) CONTAINS toLower($query)
-					RETURN id(n) as id, labels(n)[0] as type, n.name as name, size((n)--()) as connections
+					RETURN id(n) as id, labels(n)[0] as type, n.name as name, COUNT { (n)--() } as connections
 					ORDER BY connections DESC
 					LIMIT 20
 					`,

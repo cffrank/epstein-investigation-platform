@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ platform }) => {
 		const cypher = `
 			MATCH (n)
 			WHERE n:Person OR n:Organization OR n:Location
-			WITH n, labels(n)[0] as type, size((n)--()) as connections
+			WITH n, labels(n)[0] as type, COUNT { (n)--() } as connections
 			RETURN id(n) as id, n.name as name, type, connections
 			ORDER BY connections DESC
 			LIMIT 50

@@ -5,9 +5,6 @@
 	"compatibility_flags": ["nodejs_compat"],
 	"vars": {
 		"API_BASE_URL": "https://epstein-api.allfrontoffice.com",
-		"QDRANT_URL": "http://88.99.61.233:6333",
-		"QDRANT_COLLECTION": "document_embeddings_v2",
-		"NEO4J_URL": "http://88.99.61.233:7474",
-		"NEO4J_USER": "neo4j"
+		"QDRANT_COLLECTION": "document_embeddings_v2"
 	}
 }

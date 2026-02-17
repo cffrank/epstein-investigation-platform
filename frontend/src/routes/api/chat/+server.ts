@@ -8,9 +8,11 @@ interface ChatRequest {
 }
 
 interface QdrantPayload {
-	doc_id: string;
+	document_id: string;
+	doc_id?: string;
 	chunk_index: number;
-	text: string;
+	text?: string;
+	text_preview?: string;
 }
 
 interface DocumentRow {
@@ -64,12 +66,12 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 		// Extract document IDs and fetch metadata
 		const docIds = [
-			...new Set(searchResults.map((r) => (r.payload as unknown as QdrantPayload).doc_id))
+			...new Set(searchResults.map((r) => { const p = r.payload as unknown as QdrantPayload; return p.document_id || p.doc_id; }))
 		];
 
-		const documents = await query<DocumentRow>(
+		const documents = await query<DocumentRow & { text: string }>(
 			platform,
-			`SELECT id, filename, source, created_at FROM documents WHERE id = ANY($1)`,
+			`SELECT id, filename, source, created_at, COALESCE(metadata->>'text', '') as text FROM documents WHERE id = ANY($1)`,
 			[docIds]
 		);
 
@@ -78,21 +80,27 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		// Build citations
 		const citationsData: Citation[] = searchResults.map((result, index) => {
 			const payload = result.payload as unknown as QdrantPayload;
-			const doc = docMap.get(payload.doc_id);
+			const docId = payload.document_id || payload.doc_id || '';
+			const doc = docMap.get(docId);
+			const excerpt = payload.text_preview || payload.text || doc?.text?.slice(0, 200) || '';
 			return {
 				index: index + 1,
-				document_id: payload.doc_id,
+				document_id: docId,
 				filename: doc?.filename || 'Unknown',
 				source: doc?.source || 'Unknown',
-				excerpt: payload.text.slice(0, 200),
+				excerpt: excerpt.slice(0, 200),
 				score: result.score
 			};
 		});
 
-		// Build context for system prompt
+		// Build context for system prompt using full document text
 		const contextChunks = searchResults.map((result, index) => {
 			const payload = result.payload as unknown as QdrantPayload;
-			return `[${index + 1}] ${payload.text}`;
+			const docId = payload.document_id || payload.doc_id || '';
+			const doc = docMap.get(docId);
+			// Use text_preview from Qdrant, fall back to doc text from PG
+			const chunkText = payload.text_preview || payload.text || doc?.text?.slice(0, 2000) || '';
+			return `[${index + 1}] ${chunkText}`;
 		});
 
 		const systemPrompt = `You are an AI assistant helping to analyze documents from the Epstein investigation platform. Use the following context from the document corpus to answer the user's question. Cite your sources using the citation numbers in square brackets (e.g., [1], [2]).

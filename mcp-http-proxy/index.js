@@ -18,6 +18,11 @@ const pool = new Pool({
 
 const API_SECRET_KEY = process.env.API_SECRET_KEY || "";
 const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379/0";
+const QDRANT_URL = process.env.QDRANT_URL || "http://qdrant:6333";
+const QDRANT_API_KEY = process.env.QDRANT_API_KEY || "";
+const NEO4J_URL = process.env.NEO4J_URL || "http://neo4j:7474";
+const NEO4J_USER = process.env.NEO4J_USER || "neo4j";
+const NEO4J_PASSWORD = process.env.NEO4J_PASSWORD || "";
 
 // --- Redis setup ---
 const redis = createClient({ url: REDIS_URL });
@@ -229,6 +234,56 @@ app.post("/tools/:name", async (c) => {
     console.error("Tool " + toolName + " error:", error);
     return c.json({ error: error.message }, 500);
   }
+});
+
+// --- Qdrant proxy (authenticated passthrough) ---
+app.post("/qdrant/*", requireAuth, async (c) => {
+  const path = c.req.path.replace(/^\/qdrant/, "");
+  const body = await c.req.text();
+  const headers = { "Content-Type": "application/json" };
+  if (QDRANT_API_KEY) headers["api-key"] = QDRANT_API_KEY;
+
+  const resp = await fetch(QDRANT_URL + path, {
+    method: "POST",
+    headers,
+    body,
+  });
+  const data = await resp.text();
+  return c.body(data, resp.status, {
+    "Content-Type": "application/json",
+  });
+});
+
+app.get("/qdrant/*", requireAuth, async (c) => {
+  const path = c.req.path.replace(/^\/qdrant/, "");
+  const headers = {};
+  if (QDRANT_API_KEY) headers["api-key"] = QDRANT_API_KEY;
+
+  const resp = await fetch(QDRANT_URL + path, { headers });
+  const data = await resp.text();
+  return c.body(data, resp.status, {
+    "Content-Type": "application/json",
+  });
+});
+
+// --- Neo4j proxy (authenticated passthrough) ---
+app.post("/neo4j/*", requireAuth, async (c) => {
+  const path = c.req.path.replace(/^\/neo4j/, "");
+  const body = await c.req.text();
+  const auth = Buffer.from(NEO4J_USER + ":" + NEO4J_PASSWORD).toString("base64");
+
+  const resp = await fetch(NEO4J_URL + path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Basic " + auth,
+    },
+    body,
+  });
+  const data = await resp.text();
+  return c.body(data, resp.status, {
+    "Content-Type": resp.headers.get("Content-Type") || "application/json",
+  });
 });
 
 process.on("SIGTERM", async () => {

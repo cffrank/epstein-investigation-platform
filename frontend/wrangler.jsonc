@@ -1,0 +1,19 @@
+{
+	"name": "epstein-frontend",
+	"pages_build_output_dir": ".svelte-kit/cloudflare",
+	"compatibility_date": "2025-01-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"vars": {
+		"QDRANT_URL": "http://88.99.61.233:6333",
+		"QDRANT_COLLECTION": "document_embeddings_v2",
+		"NEO4J_URL": "http://88.99.61.233:7474",
+		"R2_BUCKET_URL": "https://epstein-documents.r2.cloudflarestorage.com"
+	}
+	// Hyperdrive binding - configure in Cloudflare dashboard:
+	// "hyperdrive": [
+	//   {
+	//     "binding": "HYPERDRIVE",
+	//     "id": "<hyperdrive-config-id>"
+	//   }
+	// ]
+}

@@ -16,18 +16,23 @@
 
 	let localSearchTerm = $state('');
 	let currentMatchIndex = $state(0);
-	let totalMatches = $state(0);
 
-	const entityColors = {
+	const entityColors: Record<string, string> = {
 		Person: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
 		Organization: 'bg-green-500/20 text-green-400 border-green-500/30',
 		Location: 'bg-orange-500/20 text-orange-400 border-orange-500/30'
 	};
 
-	function highlightText(text: string): string {
-		if (!text) return '';
+	function escapeHtml(str: string): string {
+		return str
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;');
+	}
 
-		let result = text;
+	function buildHighlightedHtml(rawText: string, search: string): string {
+		if (!rawText) return '';
 
 		// Build entity patterns for highlighting
 		const entityPatterns = entities.map((e) => ({
@@ -36,47 +41,42 @@
 			pattern: new RegExp(`\\b${e.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi')
 		}));
 
-		// Create segments with entity markers
-		const segments: Array<{ text: string; entity?: EntityRef }> = [];
-		let lastIndex = 0;
-		const matches: Array<{ index: number; length: number; entity: EntityRef }> = [];
-
+		// Collect entity matches
+		const entityMatches: Array<{ index: number; length: number; entity: EntityRef }> = [];
 		for (const { name, type, pattern } of entityPatterns) {
 			let match;
 			pattern.lastIndex = 0;
-			while ((match = pattern.exec(result)) !== null) {
-				matches.push({
+			while ((match = pattern.exec(rawText)) !== null) {
+				entityMatches.push({
 					index: match.index,
 					length: match[0].length,
 					entity: { id: '', name, type }
 				});
 			}
 		}
+		entityMatches.sort((a, b) => a.index - b.index);
 
-		matches.sort((a, b) => a.index - b.index);
-
-		for (const match of matches) {
-			if (match.index >= lastIndex) {
-				if (match.index > lastIndex) {
-					segments.push({ text: result.substring(lastIndex, match.index) });
+		// Build segments
+		const segments: Array<{ text: string; entity?: EntityRef }> = [];
+		let lastIndex = 0;
+		for (const m of entityMatches) {
+			if (m.index >= lastIndex) {
+				if (m.index > lastIndex) {
+					segments.push({ text: rawText.substring(lastIndex, m.index) });
 				}
-				segments.push({
-					text: result.substring(match.index, match.index + match.length),
-					entity: match.entity
-				});
-				lastIndex = match.index + match.length;
+				segments.push({ text: rawText.substring(m.index, m.index + m.length), entity: m.entity });
+				lastIndex = m.index + m.length;
 			}
 		}
-
-		if (lastIndex < result.length) {
-			segments.push({ text: result.substring(lastIndex) });
+		if (lastIndex < rawText.length) {
+			segments.push({ text: rawText.substring(lastIndex) });
 		}
 
-		// Convert segments to HTML
+		// Convert to HTML
 		let html = segments
 			.map((seg) => {
 				if (seg.entity) {
-					const colorClass = entityColors[seg.entity.type];
+					const colorClass = entityColors[seg.entity.type] || '';
 					return `<mark class="border rounded px-0.5 ${colorClass}">${escapeHtml(seg.text)}</mark>`;
 				}
 				return escapeHtml(seg.text);
@@ -84,32 +84,31 @@
 			.join('');
 
 		// Highlight search term
-		if (localSearchTerm) {
+		if (search) {
 			const searchPattern = new RegExp(
-				`(${localSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`,
+				`(${search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`,
 				'gi'
 			);
 			html = html.replace(
 				searchPattern,
 				'<mark class="bg-yellow-500/50 text-yellow-100">$1</mark>'
 			);
-
-			// Count matches
-			const tempDiv = document.createElement('div');
-			tempDiv.innerHTML = html;
-			totalMatches = (tempDiv.textContent?.match(searchPattern) || []).length;
-		} else {
-			totalMatches = 0;
 		}
 
 		return html;
 	}
 
-	function escapeHtml(text: string): string {
-		const div = document.createElement('div');
-		div.textContent = text;
-		return div.innerHTML;
-	}
+	// Derive totalMatches separately (no state mutation)
+	const totalMatches = $derived.by(() => {
+		if (!localSearchTerm || !text) return 0;
+		const rawPattern = new RegExp(
+			localSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+			'gi'
+		);
+		return (text.match(rawPattern) || []).length;
+	});
+
+	const highlightedHtml = $derived(buildHighlightedHtml(text, localSearchTerm));
 
 	function handleSearch() {
 		currentMatchIndex = 0;
@@ -126,8 +125,6 @@
 			currentMatchIndex = (currentMatchIndex - 1 + totalMatches) % totalMatches;
 		}
 	}
-
-	const highlightedHtml = $derived(highlightText(text));
 </script>
 
 <div class="flex h-full flex-col">

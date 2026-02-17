@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/state';
+	import { afterNavigate } from '$app/navigation';
 	import Sidebar from '$lib/components/layout/Sidebar.svelte';
 	import CommandSearch from '$lib/components/layout/CommandSearch.svelte';
 	import * as Sheet from '$lib/components/ui/sheet';
@@ -11,8 +11,7 @@
 	let mobileOpen = $state(false);
 
 	// Close mobile nav on navigation
-	$effect(() => {
-		page.url.pathname;
+	afterNavigate(() => {
 		mobileOpen = false;
 	});
 </script>

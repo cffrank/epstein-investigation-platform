@@ -131,7 +131,7 @@
 									<span class="truncate">{entity.name}</span>
 								</Card.Title>
 								<Card.Description>
-									<div class="flex items-center gap-2">
+									<span class="flex items-center gap-2">
 										<Badge
 											variant="secondary"
 											style="background-color: {entityColor(entity.type)}; color: white;"
@@ -143,7 +143,7 @@
 												{entity.connections} {entity.connections === 1 ? 'connection' : 'connections'}
 											</span>
 										{/if}
-									</div>
+									</span>
 								</Card.Description>
 							</Card.Header>
 						</Card.Root>

@@ -9,7 +9,7 @@
 
 	let { data }: { data: PageData } = $props();
 
-	const connectionsByType = $derived(() => {
+	const connectionsByType = $derived.by(() => {
 		const map = new Map<string, typeof data.connections>();
 		data.connections.forEach((conn) => {
 			const key = conn.relationship_type;
@@ -98,7 +98,7 @@
 											<span class="truncate">{coEntity.name}</span>
 										</Card.Title>
 										<Card.Description>
-											<div class="flex items-center gap-2">
+											<span class="flex items-center gap-2">
 												<Badge
 													variant="secondary"
 													style="background-color: {entityColor(coEntity.type)}; color: white;"
@@ -108,7 +108,7 @@
 												<span class="text-xs">
 													{coEntity.shared_docs} {coEntity.shared_docs === 1 ? 'doc' : 'docs'}
 												</span>
-											</div>
+											</span>
 										</Card.Description>
 									</Card.Header>
 								</Card.Root>
@@ -143,7 +143,7 @@
 											{truncate(doc.filename, 80)}
 										</Card.Title>
 										<Card.Description>
-											<div class="flex items-center gap-2 flex-wrap">
+											<span class="flex items-center gap-2 flex-wrap">
 												<Badge variant="outline">{doc.source}</Badge>
 												{#if doc.doc_type}
 													<Badge variant="secondary">{doc.doc_type}</Badge>
@@ -156,7 +156,7 @@
 														{formatFileSize(doc.file_size_bytes)}
 													</span>
 												{/if}
-											</div>
+											</span>
 										</Card.Description>
 									</Card.Header>
 								</Card.Root>

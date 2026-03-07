@@ -45,7 +45,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				Authorization: `Bearer ${platform.env.OPENAI_API_KEY}`
+				Authorization: `Bearer ${(platform.env as App.Platform['env']).OPENAI_API_KEY}`
 			},
 			body: JSON.stringify({
 				model: 'text-embedding-3-small',
@@ -122,7 +122,7 @@ Answer the question based on the context provided. Always cite your sources usin
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				Authorization: `Bearer ${platform.env.OPENAI_API_KEY}`
+				Authorization: `Bearer ${(platform.env as App.Platform['env']).OPENAI_API_KEY}`
 			},
 			body: JSON.stringify({
 				model: 'gpt-4o-mini',

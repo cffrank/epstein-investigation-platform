@@ -9,8 +9,9 @@ interface Neo4jResponse {
 }
 
 export function neo4jClient(platform: App.Platform) {
-	const baseUrl = platform.env.API_BASE_URL;
-	const apiKey = platform.env.API_SECRET_KEY;
+	const env = platform.env as App.Platform['env'];
+	const baseUrl = env.API_BASE_URL;
+	const apiKey = env.API_SECRET_KEY;
 
 	return {
 		async query(

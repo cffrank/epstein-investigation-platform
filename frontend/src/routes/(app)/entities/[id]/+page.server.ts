@@ -105,6 +105,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 				r2_key: null,
 				text: null,
 				page_count: null,
+				content_hash: null,
 				created_at: doc.created_at
 			}));
 		}

@@ -84,9 +84,9 @@
 					<Badge
 						variant="secondary"
 						class="mt-1"
-						style="background-color: {entityColor(selectedNodeData.type)}; color: white;"
+						style="background-color: {entityColor(('type' in selectedNodeData ? selectedNodeData.type : ''))}; color: white;"
 					>
-						{selectedNodeData.type}
+						{('type' in selectedNodeData ? selectedNodeData.type : '')}
 					</Badge>
 				</div>
 				<button

@@ -166,7 +166,7 @@ async function semanticSearch(
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
-			Authorization: `Bearer ${platform.env.OPENAI_API_KEY}`
+			Authorization: `Bearer ${(platform.env as App.Platform['env']).OPENAI_API_KEY}`
 		},
 		body: JSON.stringify({
 			model: 'text-embedding-3-small',

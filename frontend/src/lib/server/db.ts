@@ -9,8 +9,9 @@ export async function query<T = Record<string, unknown>>(
 	sql: string,
 	params?: unknown[]
 ): Promise<T[]> {
-	const baseUrl = platform.env.API_BASE_URL;
-	const apiKey = platform.env.API_SECRET_KEY;
+	const env = platform.env as App.Platform['env'];
+	const baseUrl = env.API_BASE_URL;
+	const apiKey = env.API_SECRET_KEY;
 
 	const response = await fetch(`${baseUrl}/mcp/query`, {
 		method: 'POST',

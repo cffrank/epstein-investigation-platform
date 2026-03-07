@@ -130,7 +130,7 @@
 
 	<Separator class="mb-4" />
 
-	<Accordion class="w-full" value="sources">
+	<Accordion class="w-full" value={["sources"]}>
 		<AccordionItem value="sources">
 			<AccordionTrigger>Source Datasets</AccordionTrigger>
 			<AccordionContent>

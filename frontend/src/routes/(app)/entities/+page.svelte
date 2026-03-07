@@ -11,7 +11,7 @@
 	let { data }: { data: PageData } = $props();
 
 	let searchQuery = $state('');
-	let activeType = $state<EntityType | 'All'>('All');
+	let activeType = $state<string>('All');
 	let entities = $state<Entity[]>(data.entities);
 	let loading = $state(false);
 	let page = $state(0);

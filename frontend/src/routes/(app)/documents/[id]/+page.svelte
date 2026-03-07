@@ -8,9 +8,10 @@
 
 	let { data }: { data: PageData } = $props();
 
-	const { document, entities } = data;
+	const document = data.document!;
+	const entities = data.entities;
 
-	const entityColors = {
+	const entityColors: Record<string, string> = {
 		Person: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
 		Organization: 'bg-green-500/20 text-green-400 border-green-500/30',
 		Location: 'bg-orange-500/20 text-orange-400 border-orange-500/30'

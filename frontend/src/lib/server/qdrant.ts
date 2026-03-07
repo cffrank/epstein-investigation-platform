@@ -11,9 +11,10 @@ interface QdrantSearchResponse {
 }
 
 export function qdrantClient(platform: App.Platform) {
-	const baseUrl = platform.env.API_BASE_URL;
-	const apiKey = platform.env.API_SECRET_KEY;
-	const collection = platform.env.QDRANT_COLLECTION;
+	const env = platform.env as App.Platform['env'];
+	const baseUrl = env.API_BASE_URL;
+	const apiKey = env.API_SECRET_KEY;
+	const collection = env.QDRANT_COLLECTION;
 
 	return {
 		async search(

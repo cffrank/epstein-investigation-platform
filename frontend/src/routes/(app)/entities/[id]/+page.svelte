@@ -182,8 +182,8 @@
 						</Card.Content>
 					</Card.Root>
 				{:else}
-					<Accordion.Root>
-						{#each connectionsByType() as [relType, connections], i}
+					<Accordion.Root type="multiple">
+						{#each connectionsByType as [relType, connections], i}
 							<Accordion.Item value={`item-${i}`}>
 								<Accordion.Trigger>
 									<div class="flex items-center gap-2">

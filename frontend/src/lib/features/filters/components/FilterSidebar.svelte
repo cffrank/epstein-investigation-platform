@@ -7,15 +7,17 @@
 	interface Props {
 		sources?: string[];
 		docTypes?: string[];
+		classifications?: string[];
 		dateRange?: [string, string];
 		onFilterChange: (filters: {
 			sources?: string[];
 			docTypes?: string[];
+			classifications?: string[];
 			dateRange?: [string, string];
 		}) => void;
 	}
 
-	let { sources = [], docTypes = [], dateRange, onFilterChange }: Props = $props();
+	let { sources = [], docTypes = [], classifications = [], dateRange, onFilterChange }: Props = $props();
 
 	// Common datasets from the system
 	const availableSources = [
@@ -39,8 +41,24 @@
 		'Other'
 	];
 
+	const availableClassifications = [
+		'email',
+		'deposition_transcript',
+		'court_filing',
+		'financial_record',
+		'flight_log',
+		'calendar_entry',
+		'letter_correspondence',
+		'legal_motion',
+		'fbi_report',
+		'photograph',
+		'handwritten_note',
+		'other'
+	];
+
 	let selectedSources = $state<Set<string>>(new Set(sources));
 	let selectedDocTypes = $state<Set<string>>(new Set(docTypes));
+	let selectedClassifications = $state<Set<string>>(new Set(classifications));
 	let startDate = $state(dateRange?.[0] || '');
 	let endDate = $state(dateRange?.[1] || '');
 
@@ -62,6 +80,15 @@
 		emitFilters();
 	}
 
+	function toggleClassification(classification: string) {
+		if (selectedClassifications.has(classification)) {
+			selectedClassifications.delete(classification);
+		} else {
+			selectedClassifications.add(classification);
+		}
+		emitFilters();
+	}
+
 	function updateDateRange() {
 		emitFilters();
 	}
@@ -70,6 +97,7 @@
 		onFilterChange({
 			sources: selectedSources.size > 0 ? Array.from(selectedSources) : undefined,
 			docTypes: selectedDocTypes.size > 0 ? Array.from(selectedDocTypes) : undefined,
+			classifications: selectedClassifications.size > 0 ? Array.from(selectedClassifications) : undefined,
 			dateRange:
 				startDate && endDate ? ([startDate, endDate] as [string, string]) : undefined
 		});
@@ -78,13 +106,14 @@
 	function clearAll() {
 		selectedSources.clear();
 		selectedDocTypes.clear();
+		selectedClassifications.clear();
 		startDate = '';
 		endDate = '';
 		emitFilters();
 	}
 
 	let hasActiveFilters = $derived(
-		selectedSources.size > 0 || selectedDocTypes.size > 0 || (startDate && endDate)
+		selectedSources.size > 0 || selectedDocTypes.size > 0 || selectedClassifications.size > 0 || (startDate && endDate)
 	);
 </script>
 
@@ -134,6 +163,25 @@
 								class="rounded border-gray-300"
 							/>
 							<span class="text-sm">{type}</span>
+						</label>
+					{/each}
+				</div>
+			</AccordionContent>
+		</AccordionItem>
+
+		<AccordionItem value="classifications">
+			<AccordionTrigger>Content Classification</AccordionTrigger>
+			<AccordionContent>
+				<div class="space-y-2 pl-2">
+					{#each availableClassifications as classification}
+						<label class="flex items-center gap-2 cursor-pointer">
+							<input
+								type="checkbox"
+								checked={selectedClassifications.has(classification)}
+								onchange={() => toggleClassification(classification)}
+								class="rounded border-gray-300"
+							/>
+							<span class="text-sm">{classification.replace(/_/g, ' ')}</span>
 						</label>
 					{/each}
 				</div>

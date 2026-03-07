@@ -1213,6 +1213,34 @@ services:
           memory: 4G
 
   # ===================
+  # DOCUMENT CLASSIFIER
+  # Classifies documents using Cloudflare Workers AI (LLM)
+  # Run with: docker compose -f docker-compose.processing.yml run document-classifier
+  # ===================
+  document-classifier:
+    build:
+      context: ./processing/document-classifier
+      dockerfile: Dockerfile
+    container_name: document-classifier
+    restart: "no"
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      WORKER_URL: ${WORKER_URL:-https://epstein-api.carl-f-frank.workers.dev}
+      API_SECRET_KEY: ${API_SECRET_KEY}
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # ===================
   # INVESTIGATION AGENT
   # Autonomous investigation of the document corpus
   # Uses tiered AI: Workers AI (bulk) / Sonnet (reasoning) / Opus (deep)

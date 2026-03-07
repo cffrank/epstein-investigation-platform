@@ -46,7 +46,7 @@ ssh root@88.99.61.233
 ### PostgreSQL
 - Host: `127.0.0.1`, Port: 5432
 - Database: platform, User: investigation
-- Password: `kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF`
+- Password: See `/opt/app/.env` on server
 
 ```bash
 docker exec postgres psql -U investigation -d platform -c "YOUR SQL"

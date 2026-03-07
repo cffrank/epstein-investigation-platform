@@ -25,7 +25,7 @@ DB_HOST = "127.0.0.1"
 DB_PORT = "5432"
 DB_NAME = "platform"
 DB_USER = "investigation"
-DB_PASS = "kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF"
+DB_PASS = os.environ.get("DB_PASS", "")
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tif", ".tiff"}
 DOC_EXTS = {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"}

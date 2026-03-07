@@ -17,7 +17,7 @@ async function testServer(serverPath, serverName, tests) {
       PG_HOST: 'localhost',
       PG_DATABASE: 'platform',
       PG_USER: 'investigation',
-      PG_PASSWORD: 'kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF',
+      PG_PASSWORD: process.env.PG_PASSWORD || '',
     },
   });
 

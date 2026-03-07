@@ -2,7 +2,7 @@
   "mcpServers": {
     "postgres": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://investigation:kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF@postgres:5432/platform"]
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://investigation:${POSTGRES_PASSWORD}@postgres:5432/platform"]
     },
     "qdrant": {
       "command": "/opt/mcp-qdrant-venv/bin/mcp-server-qdrant",
@@ -26,14 +26,14 @@
       "command": "node",
       "args": ["/opt/mcp-document-search/index.js"],
       "env": {
-        "DATABASE_URL": "postgresql://investigation:kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF@postgres:5432/platform"
+        "DATABASE_URL": "postgresql://investigation:${POSTGRES_PASSWORD}@postgres:5432/platform"
       }
     },
     "epstein-intelligence": {
       "command": "node",
       "args": ["/opt/mcp-intelligence/index.js"],
       "env": {
-        "DATABASE_URL": "postgresql://investigation:kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF@postgres:5432/platform"
+        "DATABASE_URL": "postgresql://investigation:${POSTGRES_PASSWORD}@postgres:5432/platform"
       }
     },
     "filesystem": {

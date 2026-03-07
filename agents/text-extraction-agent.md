@@ -50,7 +50,7 @@ ssh root@88.99.61.233
 - Port: 5432
 - Database: platform
 - User: investigation
-- Password: `kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF`
+- Password: See `/opt/app/.env` on server
 
 ```bash
 docker exec postgres psql -U investigation -d platform -c "YOUR SQL"
@@ -322,7 +322,7 @@ ssh root@88.99.61.233 'docker exec postgres psql -U investigation -d platform -c
 
 ## Important Notes
 
-- API key: Use `API_SECRET_KEY` from `/opt/app/.env`, NOT `test-api-key-12345`
+- API key: Use `API_SECRET_KEY` from `/opt/app/.env`
 - Error handling: Mark errors as `embedding_status = 'error'`, never reset to 'pending' (causes infinite retry loops)
 - Null bytes: Text extraction strips `\x00` before PostgreSQL storage
 - psycopg2 encoding: Use `.encode("ascii", errors="replace").decode("ascii")` for special characters

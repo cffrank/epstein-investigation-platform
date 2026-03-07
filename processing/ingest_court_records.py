@@ -15,7 +15,7 @@ DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
 DB_PORT = os.environ.get("DB_PORT", "5432")
 DB_NAME = os.environ.get("DB_NAME", "platform")
 DB_USER = os.environ.get("DB_USER", "investigation")
-DB_PASS = os.environ.get("DB_PASS", "kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF")
+DB_PASS = os.environ.get("DB_PASS", "")
 
 # Source mapping: local dir -> (source name, s3 prefix)
 SOURCES = {

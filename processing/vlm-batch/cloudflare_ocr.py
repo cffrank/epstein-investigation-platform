@@ -43,20 +43,20 @@ logger = logging.getLogger(__name__)
 
 # Configuration - Use Worker endpoint instead of direct API
 WORKER_URL = os.getenv("WORKER_URL", "https://epstein-api.carl-f-frank.workers.dev")
-API_SECRET_KEY = os.getenv("API_SECRET_KEY", "test-api-key-12345")
+API_SECRET_KEY = os.getenv("API_SECRET_KEY", "")
 
 # Hetzner S3 Configuration
 HETZNER_S3_ENDPOINT = "https://fsn1.your-objectstorage.com"
 HETZNER_S3_BUCKET = "epstein-documents"
-HETZNER_ACCESS_KEY = os.getenv("HETZNER_ACCESS_KEY", "699EF3OFI3TCI0C819PP")
-HETZNER_SECRET_KEY = os.getenv("HETZNER_SECRET_KEY", "mNTblO15Z7H2uu6w9hb422q6wXszwmrQRThBpeHU")
+HETZNER_ACCESS_KEY = os.getenv("HETZNER_ACCESS_KEY", "")
+HETZNER_SECRET_KEY = os.getenv("HETZNER_SECRET_KEY", "")
 
 # PostgreSQL Configuration
 POSTGRES_HOST = "127.0.0.1"
 POSTGRES_PORT = 5432
 POSTGRES_DB = "platform"
 POSTGRES_USER = "investigation"
-POSTGRES_PASSWORD = "kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF"
+POSTGRES_PASSWORD = os.getenv("PG_PASSWORD", "")
 
 # Processing settings
 MAX_PAGES = 20

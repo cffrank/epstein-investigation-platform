@@ -50,7 +50,7 @@ ssh root@88.99.61.233
 - Port: 5432
 - Database: platform
 - User: investigation
-- Password: `kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF`
+- Password: See `/opt/app/.env` on server
 
 ```bash
 # Direct query

@@ -8,7 +8,7 @@
         "PG_PORT": "5432",
         "PG_DATABASE": "platform",
         "PG_USER": "investigation",
-        "PG_PASSWORD": "kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF"
+        "PG_PASSWORD": "${PG_PASSWORD}"
       }
     },
     "epstein-intelligence": {
@@ -19,7 +19,7 @@
         "PG_PORT": "5432",
         "PG_DATABASE": "platform",
         "PG_USER": "investigation",
-        "PG_PASSWORD": "kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF"
+        "PG_PASSWORD": "${PG_PASSWORD}"
       }
     }
   }

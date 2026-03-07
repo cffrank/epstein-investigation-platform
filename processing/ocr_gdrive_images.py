@@ -28,8 +28,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Config
-PG = dict(host="127.0.0.1", port=5432, database="platform", user="investigation",
-          password="kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF")
+PG = dict(host=os.getenv("PG_HOST", "127.0.0.1"), port=5432, database="platform", user="investigation",
+          password=os.getenv("PG_PASSWORD", ""))
 WORKER_URL = os.getenv("WORKER_URL", "https://epstein-api.carl-f-frank.workers.dev")
 API_KEY = os.getenv("API_SECRET_KEY", "")
 ZIP_DIR = Path("/opt/app/data/downloads/house-oversight-gdrive")

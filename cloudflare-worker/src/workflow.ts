@@ -11,6 +11,7 @@ interface Env {
   API_SECRET_KEY: string;
   AI_GATEWAY_TOKEN: string;
   ORIGIN_URL: string;
+  OPENAI_API_KEY: string;
 }
 
 interface DocumentProcessingParams {
@@ -64,24 +65,25 @@ export class DocumentProcessingWorkflow extends WorkflowEntrypoint<Env, Document
     const embeddingPromise = step.do('generate-embedding', async () => {
       const textChunk = extractResult.text.slice(0, 8000);
 
-      const embeddingResponse = await this.env.AI.run(
-        '@cf/baai/bge-base-en-v1.5',
-        { text: [textChunk] },
-        {
-          gateway: {
-            id: 'internal-gateway',
-            headers: {
-              'cf-aig-authorization': `Bearer ${this.env.AI_GATEWAY_TOKEN}`,
-            },
-          },
-        }
-      ) as { data: number[][] };
+      const response = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'text-embedding-3-small',
+          input: textChunk,
+          dimensions: 1536,
+        }),
+      });
+      const data = await response.json() as { data: { embedding: number[] }[] };
 
-      if (!embeddingResponse?.data?.[0]) {
+      if (!data?.data?.[0]?.embedding) {
         throw new Error('Embedding generation failed');
       }
 
-      return embeddingResponse.data[0];
+      return data.data[0].embedding;
     });
 
     // Step 3: Extract entities (runs in parallel with embedding)
@@ -201,18 +203,19 @@ export class BatchProcessingWorkflow extends WorkflowEntrypoint<Env, { documents
             }
 
             // Generate embedding
-            const embeddingResponse = await this.env.AI.run(
-              '@cf/baai/bge-base-en-v1.5',
-              { text: ['Document processing placeholder'] },
-              {
-                gateway: {
-                  id: 'internal-gateway',
-                  headers: {
-                    'cf-aig-authorization': `Bearer ${this.env.AI_GATEWAY_TOKEN}`,
-                  },
-                },
-              }
-            ) as { data: number[][] };
+            const embeddingResp = await fetch('https://api.openai.com/v1/embeddings', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.env.OPENAI_API_KEY}`,
+              },
+              body: JSON.stringify({
+                model: 'text-embedding-3-small',
+                input: 'Document processing placeholder',
+                dimensions: 1536,
+              }),
+            });
+            const embeddingData = await embeddingResp.json() as { data: { embedding: number[] }[] };
 
             return { documentId: doc.documentId, status: 'completed' };
           } catch (error) {

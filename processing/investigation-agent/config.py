@@ -30,7 +30,7 @@ CLAUDE_OPUS_MODEL = os.environ.get('CLAUDE_OPUS_MODEL', 'claude-opus-4-20250514'
 
 # Workers AI (via Cloudflare Worker)
 WORKERS_AI_URL = os.environ.get('WORKERS_AI_URL', 'https://epstein-api.carl-f-frank.workers.dev')
-WORKERS_AI_API_KEY = os.environ.get('WORKERS_AI_API_KEY', 'test-api-key-12345')
+WORKERS_AI_API_KEY = os.environ.get('WORKERS_AI_API_KEY', '')
 WORKERS_AI_MODEL = os.environ.get('WORKERS_AI_MODEL', '@cf/meta/llama-4-scout-17b-16e-instruct')
 
 # Hetzner Object Storage (S3-compatible)

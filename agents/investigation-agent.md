@@ -145,7 +145,7 @@ Saved to: `/app/reports/{investigation_id}/report_{timestamp}.md`
 | NEO4J_HOST | neo4j | Neo4j host |
 | ANTHROPIC_API_KEY | (required) | Anthropic API key |
 | WORKERS_AI_URL | CF Worker URL | Workers AI endpoint |
-| WORKERS_AI_API_KEY | test-api-key-12345 | Workers AI auth |
+| WORKERS_AI_API_KEY | (required) | Workers AI auth |
 | WORKERS_AI_MODEL | @cf/meta/llama-4-scout-17b-16e-instruct | Default Workers AI model |
 | CLAUDE_SONNET_MODEL | claude-sonnet-4-20250514 | Sonnet model |
 | CLAUDE_OPUS_MODEL | claude-opus-4-20250514 | Opus model |
@@ -173,7 +173,7 @@ docker stop investigation-agent
 ### Workers AI returns empty responses
 Check CF Worker is deployed and API key is valid:
 ```bash
-curl -s -H "X-API-Key: test-api-key-12345" \
+curl -s -H "X-API-Key: $API_SECRET_KEY" \
   -H "Content-Type: application/json" \
   -d '{"prompt":"test","max_tokens":10}' \
   https://epstein-api.carl-f-frank.workers.dev/ai/generate

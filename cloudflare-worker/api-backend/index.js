@@ -109,7 +109,7 @@ app.post('/vector-search', async (c) => {
   try {
     const { vector, limit = 10, filters } = await c.req.json();
 
-    const searchResult = await qdrant.search('document_embeddings', {
+    const searchResult = await qdrant.search('document_embeddings_v2', {
       vector,
       limit,
       with_payload: true,
@@ -1009,7 +1009,7 @@ app.post('/api/embeddings', requireApiKey, async (c) => {
     const pointId = Math.abs(hashCode(documentId)) % Number.MAX_SAFE_INTEGER;
 
     // Upsert to Qdrant
-    await qdrant.upsert('document_embeddings', {
+    await qdrant.upsert('document_embeddings_v2', {
       wait: true,
       points: [
         {
@@ -1165,7 +1165,7 @@ app.post('/api/search', requireApiKey, async (c) => {
       return c.json({ error: 'vector array required' }, 400);
     }
 
-    const searchResult = await qdrant.search('document_embeddings', {
+    const searchResult = await qdrant.search('document_embeddings_v2', {
       vector,
       limit,
       with_payload: true,
@@ -1384,7 +1384,7 @@ app.post('/documents/complete', async (c) => {
     // Store embedding in Qdrant if provided
     if (embedding && embedding.length > 0) {
       try {
-        await qdrant.upsert('document_embeddings', {
+        await qdrant.upsert('document_embeddings_v2', {
           wait: true,
           points: [{
             id: documentId,
@@ -1504,7 +1504,7 @@ app.post('/embeddings', requireApiKey, async (c) => {
     const pointId = Math.abs(hashCode(documentId)) % Number.MAX_SAFE_INTEGER;
 
     // Upsert to Qdrant
-    await qdrant.upsert('document_embeddings', {
+    await qdrant.upsert('document_embeddings_v2', {
       wait: true,
       points: [{
         id: pointId,

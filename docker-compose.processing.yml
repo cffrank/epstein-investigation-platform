@@ -1181,6 +1181,38 @@ services:
           memory: 1G
 
   # ===================
+  # ENTITY RESOLUTION
+  # Deduplicates Neo4j entities using Jaro-Winkler similarity
+  # Syncs resolved entities to PostgreSQL
+  # Run with: docker compose -f docker-compose.processing.yml run entity-resolution
+  # ===================
+  entity-resolution:
+    build:
+      context: ./processing/entity-resolution
+      dockerfile: Dockerfile
+    container_name: entity-resolution
+    restart: "no"
+    environment:
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: ${POSTGRES_DB}
+      PG_USER: ${POSTGRES_USER}
+      PG_PASSWORD: ${POSTGRES_PASSWORD}
+      NEO4J_HOST: neo4j
+      NEO4J_BOLT_PORT: 7687
+      NEO4J_USER: ${NEO4J_USER}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+      - neo4j
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+
+  # ===================
   # INVESTIGATION AGENT
   # Autonomous investigation of the document corpus
   # Uses tiered AI: Workers AI (bulk) / Sonnet (reasoning) / Opus (deep)

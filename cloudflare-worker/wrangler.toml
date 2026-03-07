@@ -26,6 +26,8 @@ id = "internal-gateway"
 ENVIRONMENT = "production"
 ORIGIN_URL = "https://epstein-api.allfrontoffice.com"
 
+# OPENAI_API_KEY must be set via `wrangler secret put OPENAI_API_KEY`
+
 # Document processing queue
 [[queues.producers]]
 binding = "DOCUMENT_QUEUE"

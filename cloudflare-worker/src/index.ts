@@ -14,6 +14,7 @@ type Bindings = {
   BATCH_WORKFLOW: Workflow;
   API_SECRET_KEY: string;
   AI_GATEWAY_TOKEN: string;
+  OPENAI_API_KEY: string;
   ORIGIN_URL: string;
   ENVIRONMENT: string;
 };
@@ -139,22 +140,28 @@ app.post('/search', async (c) => {
       // Cache miss or D1 unavailable, continue to origin
     }
 
-    // Generate embedding using Workers AI (BGE-base for document search)
-    // AI Gateway authentication is required for Zero Trust access
-    const embeddingResponse = await c.env.AI.run(
-      '@cf/baai/bge-base-en-v1.5',
-      { text: [query] },
-      {
-        gateway: {
-          id: 'internal-gateway',
-          headers: {
-            'cf-aig-authorization': `Bearer ${c.env.AI_GATEWAY_TOKEN}`,
-          },
-        },
-      }
-    ) as { data: number[][] };
+    // Generate embedding using OpenAI text-embedding-3-small (1536-dim)
+    const embeddingApiResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: query,
+        dimensions: 1536,
+      }),
+    });
 
-    if (!embeddingResponse?.data?.[0]) {
+    if (!embeddingApiResponse.ok) {
+      return c.json({ error: 'Failed to generate embedding' }, 500);
+    }
+
+    const embeddingData = await embeddingApiResponse.json() as { data: { embedding: number[] }[] };
+    const embedding = embeddingData.data?.[0]?.embedding;
+
+    if (!embedding) {
       return c.json({ error: 'Failed to generate embedding' }, 500);
     }
 
@@ -167,7 +174,7 @@ app.post('/search', async (c) => {
         'X-Request-ID': c.get('requestId'),
       },
       body: JSON.stringify({
-        vector: embeddingResponse.data[0],
+        vector: embedding,
         limit,
         filters,
       }),
@@ -373,28 +380,35 @@ app.post('/ai/embedding', async (c) => {
       return c.json({ error: 'Text string required' }, 400);
     }
 
-    // Generate embedding using Workers AI (BGE-base)
-    const embeddingResponse = await c.env.AI.run(
-      '@cf/baai/bge-base-en-v1.5',
-      { text: [text.slice(0, 8000)] }, // Limit text length
-      {
-        gateway: {
-          id: 'internal-gateway',
-          headers: {
-            'cf-aig-authorization': `Bearer ${c.env.AI_GATEWAY_TOKEN}`,
-          },
-        },
-      }
-    ) as { data: number[][] };
+    // Generate embedding using OpenAI text-embedding-3-small (1536-dim)
+    const embeddingApiResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: text.slice(0, 8000),
+        dimensions: 1536,
+      }),
+    });
 
-    if (!embeddingResponse?.data?.[0]) {
+    if (!embeddingApiResponse.ok) {
+      return c.json({ error: 'Failed to generate embedding' }, 500);
+    }
+
+    const embeddingData = await embeddingApiResponse.json() as { data: { embedding: number[] }[] };
+    const embedding = embeddingData.data?.[0]?.embedding;
+
+    if (!embedding) {
       return c.json({ error: 'Failed to generate embedding' }, 500);
     }
 
     return c.json({
-      embedding: embeddingResponse.data[0],
-      dimensions: embeddingResponse.data[0].length,
-      model: '@cf/baai/bge-base-en-v1.5',
+      embedding,
+      dimensions: 1536,
+      model: 'text-embedding-3-small',
     });
   } catch (error) {
     console.error('Embedding generation error:', error);
@@ -496,28 +510,39 @@ app.post('/ai/embeddings-batch', async (c) => {
       typeof t === 'string' ? t.slice(0, 8000) : ''
     );
 
-    // Generate embeddings for all texts at once
-    const embeddingResponse = await c.env.AI.run(
-      '@cf/baai/bge-base-en-v1.5',
-      { text: safeBatch },
-      {
-        gateway: {
-          id: 'internal-gateway',
-          headers: {
-            'cf-aig-authorization': `Bearer ${c.env.AI_GATEWAY_TOKEN}`,
-          },
-        },
-      }
-    ) as { data: number[][] };
+    // Generate embeddings using OpenAI text-embedding-3-small (1536-dim)
+    const embeddingApiResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: safeBatch,
+        dimensions: 1536,
+      }),
+    });
 
-    if (!embeddingResponse?.data) {
+    if (!embeddingApiResponse.ok) {
       return c.json({ error: 'Failed to generate embeddings' }, 500);
     }
 
+    const embeddingData = await embeddingApiResponse.json() as { data: { embedding: number[]; index: number }[] };
+
+    if (!embeddingData?.data) {
+      return c.json({ error: 'Failed to generate embeddings' }, 500);
+    }
+
+    // Sort by index to maintain input order
+    const sortedEmbeddings = embeddingData.data
+      .sort((a, b) => a.index - b.index)
+      .map(d => d.embedding);
+
     return c.json({
-      embeddings: embeddingResponse.data,
-      count: embeddingResponse.data.length,
-      dimensions: embeddingResponse.data[0]?.length || 0,
+      embeddings: sortedEmbeddings,
+      count: sortedEmbeddings.length,
+      dimensions: 1536,
     });
   } catch (error) {
     console.error('Batch embedding error:', error);
@@ -715,34 +740,38 @@ app.post('/process/batch', async (c) => {
         const { text } = await extractResponse.json() as { text: string };
 
         if (text && text.length > 100) {
-          // Generate embedding
-          const embeddingResponse = await c.env.AI.run(
-            '@cf/baai/bge-base-en-v1.5',
-            { text: [text.slice(0, 8000)] },
-            {
-              gateway: {
-                id: 'internal-gateway',
-                headers: {
-                  'cf-aig-authorization': `Bearer ${c.env.AI_GATEWAY_TOKEN}`,
-                },
-              },
-            }
-          ) as { data: number[][] };
+          // Generate embedding using OpenAI text-embedding-3-small (1536-dim)
+          const embeddingApiResponse = await fetch('https://api.openai.com/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: 'text-embedding-3-small',
+              input: text.slice(0, 8000),
+              dimensions: 1536,
+            }),
+          });
 
-          if (embeddingResponse?.data?.[0]) {
-            // Store embedding
-            await fetch(`${c.env.ORIGIN_URL}/api/embeddings`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-API-Key': c.env.API_SECRET_KEY,
-              },
-              body: JSON.stringify({
-                documentId: doc.documentId,
-                embedding: embeddingResponse.data[0],
-                metadata: { source: doc.source },
-              }),
-            });
+          if (embeddingApiResponse.ok) {
+            const embeddingData = await embeddingApiResponse.json() as { data: { embedding: number[] }[] };
+            const embedding = embeddingData.data?.[0]?.embedding;
+            if (embedding) {
+              // Store embedding
+              await fetch(`${c.env.ORIGIN_URL}/api/embeddings`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-API-Key': c.env.API_SECRET_KEY,
+                },
+                body: JSON.stringify({
+                  documentId: doc.documentId,
+                  embedding,
+                  metadata: { source: doc.source },
+                }),
+              });
+            }
           }
         }
 
@@ -1140,21 +1169,29 @@ async function processQueueBatch(
             continue;
           }
 
-          // Generate embedding using Workers AI
-          const embeddingResponse = await env.AI.run(
-            '@cf/baai/bge-base-en-v1.5',
-            { text: [text] },
-            {
-              gateway: {
-                id: 'internal-gateway',
-                headers: {
-                  'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
-                },
-              },
-            }
-          ) as { data: number[][] };
+          // Generate embedding using OpenAI text-embedding-3-small (1536-dim)
+          const embeddingApiResponse = await fetch('https://api.openai.com/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: 'text-embedding-3-small',
+              input: text,
+              dimensions: 1536,
+            }),
+          });
 
-          if (!embeddingResponse?.data?.[0]) {
+          if (!embeddingApiResponse.ok) {
+            message.retry();
+            continue;
+          }
+
+          const embeddingData = await embeddingApiResponse.json() as { data: { embedding: number[] }[] };
+          const embedding = embeddingData.data?.[0]?.embedding;
+
+          if (!embedding) {
             message.retry();
             continue;
           }
@@ -1168,7 +1205,7 @@ async function processQueueBatch(
             },
             body: JSON.stringify({
               documentId,
-              embedding: embeddingResponse.data[0],
+              embedding,
               metadata,
             }),
           });
@@ -1321,21 +1358,29 @@ export default {
               continue;
             }
 
-            // Generate embedding
-            const embeddingResponse = await env.AI.run(
-              '@cf/baai/bge-base-en-v1.5',
-              { text: [text] },
-              {
-                gateway: {
-                  id: 'internal-gateway',
-                  headers: {
-                    'cf-aig-authorization': `Bearer ${env.AI_GATEWAY_TOKEN}`,
-                  },
-                },
-              }
-            ) as { data: number[][] };
+            // Generate embedding using OpenAI text-embedding-3-small (1536-dim)
+            const embeddingApiResponse = await fetch('https://api.openai.com/v1/embeddings', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
+              },
+              body: JSON.stringify({
+                model: 'text-embedding-3-small',
+                input: text,
+                dimensions: 1536,
+              }),
+            });
 
-            if (!embeddingResponse?.data?.[0]) {
+            if (!embeddingApiResponse.ok) {
+              message.retry();
+              continue;
+            }
+
+            const embeddingData = await embeddingApiResponse.json() as { data: { embedding: number[] }[] };
+            const embedding = embeddingData.data?.[0]?.embedding;
+
+            if (!embedding) {
               message.retry();
               continue;
             }
@@ -1349,7 +1394,7 @@ export default {
               },
               body: JSON.stringify({
                 documentId,
-                embedding: embeddingResponse.data[0],
+                embedding,
                 metadata,
               }),
             });

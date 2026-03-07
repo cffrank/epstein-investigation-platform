@@ -5,7 +5,7 @@
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { Button } from '$lib/components/ui/button';
 	import { entityColor } from '$lib/utils';
-	import type { Entity, EntityType } from '$lib/types';
+	import type { Entity } from '$lib/types';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -16,7 +16,7 @@
 	let loading = $state(false);
 	let page = $state(0);
 
-	async function loadEntities(search?: string, type?: EntityType) {
+	async function loadEntities(search?: string, type?: string) {
 		loading = true;
 		try {
 			const response = await fetch('/api/entities', {
@@ -25,7 +25,7 @@
 				body: JSON.stringify({
 					action: search ? 'search' : 'list',
 					query: search,
-					type: type && type !== 'All' ? type : undefined,
+					type: type || undefined,
 					offset: page * 50,
 					limit: 50
 				})
@@ -55,7 +55,7 @@
 	}
 
 	function handleTypeChange(value: string) {
-		activeType = value as EntityType | 'All';
+		activeType = value;
 		page = 0;
 		loadEntities(searchQuery || undefined, activeType !== 'All' ? activeType : undefined);
 	}

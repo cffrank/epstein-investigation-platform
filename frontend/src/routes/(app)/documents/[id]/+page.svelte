@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
+	import type { EntityRef } from '$lib/types';
 	import { formatFileSize } from '$lib/utils';
 	import Badge from '$lib/components/ui/badge/badge.svelte';
 	import * as Resizable from '$lib/components/ui/resizable';
@@ -9,7 +10,7 @@
 	let { data }: { data: PageData } = $props();
 
 	const document = data.document!;
-	const entities = data.entities;
+	const entities = data.entities as EntityRef[];
 
 	const entityColors: Record<string, string> = {
 		Person: 'bg-blue-500/20 text-blue-400 border-blue-500/30',

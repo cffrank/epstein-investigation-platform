@@ -16,7 +16,11 @@ const pool = new Pool({
   idleTimeoutMillis: 30000,
 });
 
-const API_SECRET_KEY = process.env.API_SECRET_KEY || "";
+const API_SECRET_KEY = process.env.API_SECRET_KEY;
+if (!API_SECRET_KEY) {
+  console.error("FATAL: API_SECRET_KEY not set. Refusing to start without authentication.");
+  process.exit(1);
+}
 const REDIS_URL = process.env.REDIS_URL || "redis://redis:6379/0";
 const QDRANT_URL = process.env.QDRANT_URL || "http://qdrant:6333";
 const QDRANT_API_KEY = process.env.QDRANT_API_KEY || "";
@@ -85,6 +89,14 @@ async function cachedQuery(sql, params) {
 
 const app = new Hono();
 
+const requireAuth = async (c, next) => {
+  const apiKey = c.req.header("X-API-Key");
+  if (apiKey !== API_SECRET_KEY) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+  await next();
+};
+
 app.get("/health", async (c) => {
   const redisOk = redis.isReady;
   return c.json({
@@ -103,7 +115,7 @@ app.get("/cache/stats", async (c) => {
   return c.json({ keys: keyCount, hits, misses });
 });
 
-app.post("/cache/flush", async (c) => {
+app.post("/cache/flush", requireAuth, async (c) => {
   if (!redis.isReady) return c.json({ error: "Redis not connected" }, 503);
   const flushed = await redis.keys("qc:*");
   if (flushed.length > 0) {
@@ -150,14 +162,6 @@ app.get("/tools", (c) => {
   });
 });
 
-const requireAuth = async (c, next) => {
-  const apiKey = c.req.header("X-API-Key");
-  if (API_SECRET_KEY && apiKey !== API_SECRET_KEY) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-  await next();
-};
-
 // Parameterized query endpoint for the frontend BFF
 app.post("/query", requireAuth, async (c) => {
   const body = await c.req.json().catch(() => ({}));
@@ -182,7 +186,7 @@ app.post("/query", requireAuth, async (c) => {
   }
 });
 
-app.post("/tools/:name", async (c) => {
+app.post("/tools/:name", requireAuth, async (c) => {
   const toolName = c.req.param("name");
   const body = await c.req.json().catch(() => ({}));
 

@@ -166,7 +166,7 @@ async function semanticSearch(
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
-			Authorization: `Bearer ${(platform.env as App.Platform['env']).OPENAI_API_KEY}`
+			Authorization: `Bearer ${(platform.env as { OPENAI_API_KEY: string }).OPENAI_API_KEY}`
 		},
 		body: JSON.stringify({
 			model: 'text-embedding-3-small',
@@ -255,7 +255,7 @@ async function semanticSearch(
 	const scoreMap = new Map(searchResults.map((r) => [r.payload.document_id || r.payload.doc_id, r.score]));
 
 	const results: SearchResult[] = docIds
-		.map((docId) => {
+		.map((docId): SearchResult | null => {
 			const doc = docMap.get(docId);
 			if (!doc) return null;
 

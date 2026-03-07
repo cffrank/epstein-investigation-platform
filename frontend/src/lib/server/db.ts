@@ -9,7 +9,7 @@ export async function query<T = Record<string, unknown>>(
 	sql: string,
 	params?: unknown[]
 ): Promise<T[]> {
-	const env = platform.env as App.Platform['env'];
+	const env = platform.env as { API_BASE_URL: string; API_SECRET_KEY: string };
 	const baseUrl = env.API_BASE_URL;
 	const apiKey = env.API_SECRET_KEY;
 

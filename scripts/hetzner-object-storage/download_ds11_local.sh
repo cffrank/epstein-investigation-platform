@@ -4,9 +4,9 @@ set -e
 DOWNLOAD_DIR="$HOME/epstein-ds11"
 EXTRACT_DIR="$DOWNLOAD_DIR/extracted"
 
-# Hetzner S3 credentials
-export AWS_ACCESS_KEY_ID="699EF3OFI3TCI0C819PP"
-export AWS_SECRET_ACCESS_KEY="mNTblO15Z7H2uu6w9hb422q6wXszwmrQRThBpeHU"
+# Hetzner S3 credentials - stored in ProtonPass (hetzner-s3-master)
+export AWS_ACCESS_KEY_ID="${HETZNER_S3_ACCESS_KEY:?Set HETZNER_S3_ACCESS_KEY}"
+export AWS_SECRET_ACCESS_KEY="${HETZNER_S3_SECRET_KEY:?Set HETZNER_S3_SECRET_KEY}"
 S3_ENDPOINT="https://fsn1.your-objectstorage.com"
 S3_BUCKET="epstein-documents"
 

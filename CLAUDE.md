@@ -1,5 +1,9 @@
 # Epstein Investigation Platform - System Configuration
 
+## Evolution Roadmap
+
+See `ROADMAP.md` for the phased task list. Work through tasks sequentially within each phase. Each task has explicit acceptance criteria that must pass before moving on.
+
 ## Remote Server Access
 
 ```bash

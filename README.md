@@ -1,5 +1,10 @@
 # Epstein Files Investigation Platform
 
+## Setup
+
+1. Copy `.env.example` to `.env` and fill in all values before running `docker compose up`.
+2. Never commit `.env` to version control. All secrets must live in `.env` on the server at `/opt/app/.env`.
+
 ## Quick Start
 
 ```bash
@@ -8,16 +13,20 @@ tar -xzf epstein-platform.tar.gz
 mv epstein-platform /opt/app
 cd /opt/app
 
-# 2. Run setup scripts
+# 2. Configure environment
+cp .env.example .env
+# Edit .env and fill in all required values
+
+# 3. Run setup scripts
 chmod +x scripts/*.sh
 ./scripts/01-base-setup.sh
 ./scripts/02-generate-secrets.sh
 ./scripts/03-cloudflare-setup.sh
 
-# 3. Start services
+# 4. Start services
 docker compose up -d
 
-# 4. Check health
+# 5. Check health
 ./scripts/05-health-check.sh
 ```
 

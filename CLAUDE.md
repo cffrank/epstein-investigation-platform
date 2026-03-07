@@ -107,7 +107,7 @@ Host: postgres (Docker) or 127.0.0.1 (from host)
 Port: 5432
 Database: platform
 User: investigation
-Password: kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF
+Password: See /opt/app/.env on server
 ```
 
 Direct query from host:
@@ -433,7 +433,7 @@ Required in `/opt/app/.env`:
 ```bash
 # PostgreSQL
 POSTGRES_USER=investigation
-POSTGRES_PASSWORD=kWn0ZqeRBGw8RVYwEp4KSdS86QqbQTOF
+POSTGRES_PASSWORD=  # See /opt/app/.env on server
 POSTGRES_DB=platform
 
 # Qdrant
@@ -519,14 +519,14 @@ OpenClaw Agent (Claude Opus 4.5)
 ```bash
 # Single batch (50 docs at a time)
 curl -X POST https://epstein-api.carl-f-frank.workers.dev/process/batch \
-  -H "X-API-Key: test-api-key-12345" \
+  -H "X-API-Key: $API_SECRET_KEY" \
   -H "Content-Type: application/json" \
   -d '{"limit": 50}'
 
 # Continuous processing loop
 while true; do
   result=$(curl -s -X POST https://epstein-api.carl-f-frank.workers.dev/process/batch \
-    -H "X-API-Key: test-api-key-12345" \
+    -H "X-API-Key: $API_SECRET_KEY" \
     -H "Content-Type: application/json" \
     -d '{"limit": 50}')
   echo "$(date): $result" | jq -c '{processed, completed, failed}'
@@ -552,7 +552,7 @@ docker-compose restart nginx
 for i in {1..4}; do
   while true; do
     curl -s -X POST https://epstein-api.allfrontoffice.com/api/documents/unprocessed?limit=25 \
-      -H "X-API-Key: test-api-key-12345" &
+      -H "X-API-Key: $API_SECRET_KEY" &
   done &
 done
 ```
@@ -600,5 +600,5 @@ curl -s -X POST https://epstein-api.allfrontoffice.com/mcp/tools/get_stats | jq 
 - `combined_all` dataset was deleted (redundant, all files existed in dataset_1-8)
 - Duplicate detection uses `content_hash` column with unique constraint
 - Docker network name: `app_app_network`
-- Backend API key: `test-api-key-12345` (for X-API-Key header)
+- Backend API key: `source /opt/app/.env && echo $API_SECRET_KEY` (for X-API-Key header)
 - Worker AI uses BGE-base-en-v1.5 (768 dimensions) via AI Gateway

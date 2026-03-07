@@ -8,6 +8,7 @@ interface SearchFilters {
 	dateRange?: [string, string];
 	sources?: string[];
 	docTypes?: string[];
+	classifications?: string[];
 }
 
 interface SearchRequest {
@@ -77,6 +78,12 @@ async function fulltextSearch(
 	if (filters.docTypes?.length) {
 		conditions.push(`doc_type = ANY($${paramIndex})`);
 		params.push(filters.docTypes);
+		paramIndex++;
+	}
+
+	if (filters.classifications?.length) {
+		conditions.push(`metadata->>'content_classification' = ANY($${paramIndex})`);
+		params.push(filters.classifications);
 		paramIndex++;
 	}
 
@@ -204,6 +211,12 @@ async function semanticSearch(
 	if (filters.docTypes?.length) {
 		conditions.push(`doc_type = ANY($${paramIndex})`);
 		params.push(filters.docTypes);
+		paramIndex++;
+	}
+
+	if (filters.classifications?.length) {
+		conditions.push(`metadata->>'content_classification' = ANY($${paramIndex})`);
+		params.push(filters.classifications);
 		paramIndex++;
 	}
 

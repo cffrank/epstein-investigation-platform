@@ -1,0 +1,18 @@
+{
+	"name": "epstein-investigation-platform",
+	"private": true,
+	"workspaces": [
+		"packages/*",
+		"frontend",
+		"cloudflare-worker",
+		"mcp-http-proxy"
+	],
+	"scripts": {
+		"test": "npm test --workspaces --if-present",
+		"check": "npx @biomejs/biome check .",
+		"format": "npx @biomejs/biome format --write ."
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.0"
+	}
+}

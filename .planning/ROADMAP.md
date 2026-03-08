@@ -32,12 +32,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Search queries on 961K documents return within 2 seconds (ILIKE replaced, COUNT optimized, hybrid search tuned)
   4. Vitest runs in CI on every push with passing tests for SQL builders, auth guards, and SSE parser
   5. Frontend compiles with zero TypeScript errors
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
-- [ ] 01-03: TBD
+- [ ] 01-01-PLAN.md -- Monorepo workspace + @epstein/shared package (query builders, auth guards, types)
+- [ ] 01-02-PLAN.md -- Security hardening (injection, XSS, auth, safe defaults, SQL proxy replacement)
+- [ ] 01-03-PLAN.md -- Performance optimization (FTS, capped counts, hybrid search, chat context, batch parallelization)
+- [ ] 01-04-PLAN.md -- Test infrastructure + CI/CD pipeline + TypeScript error cleanup
 
 ### Phase 2: AI Chat with Tool Use
 **Goal**: An investigator can have a natural-language conversation with Claude that searches documents, queries entities, and traverses the graph -- with every claim citing specific documents
@@ -133,7 +134,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Security and Foundation | 0/3 | Not started | - |
+| 1. Security and Foundation | 0/4 | Planning complete | - |
 | 2. AI Chat with Tool Use | 0/2 | Not started | - |
 | 3. Entity Dossier Pages | 0/2 | Not started | - |
 | 4. Faceted Search and Export | 0/1 | Not started | - |

@@ -1,15 +1,25 @@
 {
-  "name": "mcp-http-proxy",
-  "version": "1.0.0",
-  "type": "module",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
-  "dependencies": {
-    "hono": "^4.0.0",
-    "@hono/node-server": "^1.8.0",
-    "pg": "^8.11.0",
-    "redis": "^4.7.0"
-  }
+	"name": "mcp-http-proxy",
+	"version": "1.0.0",
+	"type": "module",
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"scripts": {
+		"build": "tsc",
+		"start": "node dist/index.js",
+		"dev": "tsx src/index.ts"
+	},
+	"dependencies": {
+		"@epstein/shared": "*",
+		"@hono/node-server": "^1.8.0",
+		"hono": "^4.0.0",
+		"pg": "^8.11.0",
+		"redis": "^4.7.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"@types/pg": "^8.11.0",
+		"tsx": "^4.0.0",
+		"typescript": "^5.9.3"
+	}
 }

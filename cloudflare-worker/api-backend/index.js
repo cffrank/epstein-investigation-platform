@@ -46,14 +46,19 @@ const neo4jDriver = neo4j.driver(
 );
 
 // API key for internal requests from Cloudflare Worker
-const API_SECRET_KEY = process.env.API_SECRET_KEY || '';
+// Fail-closed: refuse to start without API key
+const API_SECRET_KEY = process.env.API_SECRET_KEY;
+if (!API_SECRET_KEY) {
+  console.error('FATAL: API_SECRET_KEY not set. Refusing to start without authentication.');
+  process.exit(1);
+}
 
 const app = new Hono();
 
-// Middleware to verify API key for processing endpoints
+// Middleware to verify API key (fail-closed: always requires key)
 const requireApiKey = async (c, next) => {
   const apiKey = c.req.header('X-API-Key');
-  if (API_SECRET_KEY && apiKey !== API_SECRET_KEY) {
+  if (!apiKey || apiKey !== API_SECRET_KEY) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
   await next();

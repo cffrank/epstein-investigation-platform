@@ -179,10 +179,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOCS-04 | Phase 7 | Pending |
 
 **Coverage:**
-- v1 requirements: 48 total
-- Mapped to phases: 48
+- v1 requirements: 50 total
+- Mapped to phases: 50
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-07*
-*Last updated: 2026-03-07 after initial definition*
+*Last updated: 2026-03-07 after roadmap creation*

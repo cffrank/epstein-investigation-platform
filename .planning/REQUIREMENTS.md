@@ -9,19 +9,19 @@ Requirements for Phase 2 (Intelligence Layer). Each maps to roadmap phases.
 
 ### Security & Foundation
 
-- [ ] **SEC-01**: Fix Cypher injection in graph traversal endpoint (CR-002) — parameterize all dynamic Cypher
-- [ ] **SEC-02**: Sanitize all `{@html}` renders with DOMPurify (HI-001, HI-002, HI-003)
-- [ ] **SEC-03**: Fix Cypher query blocklist bypass via APOC (HI-004)
-- [ ] **SEC-04**: Enforce authentication in frontend hooks (CR-006)
-- [ ] **SEC-05**: Remove hardcoded API key in batch-processor.sh (HI-005)
-- [ ] **SEC-06**: Fix MCP server default to public IP without SSL (HI-006)
-- [ ] **SEC-07**: Fix ILIKE full table scans on 961K documents (CR-003) — use GIN trigram index or FTS
-- [ ] **SEC-08**: Fix fulltext search COUNT query performance (CR-005)
-- [ ] **SEC-09**: Optimize hybrid search performance (HI-007, HI-008)
-- [ ] **SEC-10**: Fix unbounded chat context growth (HI-009)
-- [ ] **SEC-11**: Parallelize Worker batch processing (HI-010)
+- [x] **SEC-01**: Fix Cypher injection in graph traversal endpoint (CR-002) — parameterize all dynamic Cypher
+- [x] **SEC-02**: Sanitize all `{@html}` renders with DOMPurify (HI-001, HI-002, HI-003)
+- [x] **SEC-03**: Fix Cypher query blocklist bypass via APOC (HI-004)
+- [x] **SEC-04**: Enforce authentication in frontend hooks (CR-006)
+- [x] **SEC-05**: Remove hardcoded API key in batch-processor.sh (HI-005)
+- [x] **SEC-06**: Fix MCP server default to public IP without SSL (HI-006)
+- [x] **SEC-07**: Fix ILIKE full table scans on 961K documents (CR-003) — use GIN trigram index or FTS
+- [x] **SEC-08**: Fix fulltext search COUNT query performance (CR-005)
+- [x] **SEC-09**: Optimize hybrid search performance (HI-007, HI-008)
+- [x] **SEC-10**: Fix unbounded chat context growth (HI-009)
+- [x] **SEC-11**: Parallelize Worker batch processing (HI-010)
 - [x] **SEC-12**: Extract shared service modules to eliminate duplication (HI-011)
-- [ ] **SEC-13**: Replace raw SQL proxy with proper API endpoints (HI-012)
+- [x] **SEC-13**: Replace raw SQL proxy with proper API endpoints (HI-012)
 - [ ] **SEC-14**: Add CI/CD pipeline for Worker and backend (HI-013)
 - [ ] **SEC-15**: Set up Vitest + basic CI gate with tests for SQL builders, auth guards, SSE parser (CR-004)
 - [ ] **SEC-16**: Resolve all 20 frontend TypeScript errors
@@ -127,19 +127,19 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SEC-01 | Phase 1 | Pending |
-| SEC-02 | Phase 1 | Pending |
-| SEC-03 | Phase 1 | Pending |
-| SEC-04 | Phase 1 | Pending |
-| SEC-05 | Phase 1 | Pending |
-| SEC-06 | Phase 1 | Pending |
-| SEC-07 | Phase 1 | Pending |
-| SEC-08 | Phase 1 | Pending |
-| SEC-09 | Phase 1 | Pending |
-| SEC-10 | Phase 1 | Pending |
-| SEC-11 | Phase 1 | Pending |
+| SEC-01 | Phase 1 | Complete |
+| SEC-02 | Phase 1 | Complete |
+| SEC-03 | Phase 1 | Complete |
+| SEC-04 | Phase 1 | Complete |
+| SEC-05 | Phase 1 | Complete |
+| SEC-06 | Phase 1 | Complete |
+| SEC-07 | Phase 1 | Complete |
+| SEC-08 | Phase 1 | Complete |
+| SEC-09 | Phase 1 | Complete |
+| SEC-10 | Phase 1 | Complete |
+| SEC-11 | Phase 1 | Complete |
 | SEC-12 | Phase 1 | Complete |
-| SEC-13 | Phase 1 | Pending |
+| SEC-13 | Phase 1 | Complete |
 | SEC-14 | Phase 1 | Pending |
 | SEC-15 | Phase 1 | Pending |
 | SEC-16 | Phase 1 | Pending |

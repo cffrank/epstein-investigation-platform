@@ -22,9 +22,9 @@ Requirements for Phase 2 (Intelligence Layer). Each maps to roadmap phases.
 - [x] **SEC-11**: Parallelize Worker batch processing (HI-010)
 - [x] **SEC-12**: Extract shared service modules to eliminate duplication (HI-011)
 - [x] **SEC-13**: Replace raw SQL proxy with proper API endpoints (HI-012)
-- [ ] **SEC-14**: Add CI/CD pipeline for Worker and backend (HI-013)
-- [ ] **SEC-15**: Set up Vitest + basic CI gate with tests for SQL builders, auth guards, SSE parser (CR-004)
-- [ ] **SEC-16**: Resolve all 20 frontend TypeScript errors
+- [x] **SEC-14**: Add CI/CD pipeline for Worker and backend (HI-013)
+- [x] **SEC-15**: Set up Vitest + basic CI gate with tests for SQL builders, auth guards, SSE parser (CR-004)
+- [x] **SEC-16**: Resolve all 20 frontend TypeScript errors
 
 ### AI Chat
 

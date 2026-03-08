@@ -20,7 +20,7 @@ Requirements for Phase 2 (Intelligence Layer). Each maps to roadmap phases.
 - [ ] **SEC-09**: Optimize hybrid search performance (HI-007, HI-008)
 - [ ] **SEC-10**: Fix unbounded chat context growth (HI-009)
 - [ ] **SEC-11**: Parallelize Worker batch processing (HI-010)
-- [ ] **SEC-12**: Extract shared service modules to eliminate duplication (HI-011)
+- [x] **SEC-12**: Extract shared service modules to eliminate duplication (HI-011)
 - [ ] **SEC-13**: Replace raw SQL proxy with proper API endpoints (HI-012)
 - [ ] **SEC-14**: Add CI/CD pipeline for Worker and backend (HI-013)
 - [ ] **SEC-15**: Set up Vitest + basic CI gate with tests for SQL builders, auth guards, SSE parser (CR-004)
@@ -138,7 +138,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SEC-09 | Phase 1 | Pending |
 | SEC-10 | Phase 1 | Pending |
 | SEC-11 | Phase 1 | Pending |
-| SEC-12 | Phase 1 | Pending |
+| SEC-12 | Phase 1 | Complete |
 | SEC-13 | Phase 1 | Pending |
 | SEC-14 | Phase 1 | Pending |
 | SEC-15 | Phase 1 | Pending |

@@ -110,10 +110,18 @@ ${contextChunks.join('\n\n')}
 
 Answer the question based on the context provided. Always cite your sources using the citation numbers.`;
 
+		// Bound chat context to sliding window (SEC-10)
+		const MAX_CONTEXT_MESSAGES = 6;
+		let contextMessages = messages;
+		if (messages.length > MAX_CONTEXT_MESSAGES) {
+			// Always include first message + last (MAX_CONTEXT_MESSAGES - 1) messages
+			contextMessages = [messages[0], ...messages.slice(-(MAX_CONTEXT_MESSAGES - 1))];
+		}
+
 		// Build messages for OpenAI
 		const apiMessages = [
 			{ role: 'system', content: systemPrompt },
-			...messages.slice(0, -1),
+			...contextMessages.slice(0, -1),
 			{ role: 'user', content: lastUserMessage.content }
 		];
 

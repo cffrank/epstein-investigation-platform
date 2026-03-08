@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { query as dbQuery } from '$lib/server/db';
 import { qdrantClient } from '$lib/server/qdrant';
 import type { SearchResult, SearchMode } from '$lib/types';
+import { validateSearchQuery, validatePaginationParams } from '@epstein/shared';
 
 interface SearchFilters {
 	dateRange?: [string, string];
@@ -25,12 +26,14 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	}
 
 	const body = (await request.json()) as SearchRequest;
-	const { query: searchQuery, filters = {}, mode, page = 1, limit = 20 } = body;
+	const { query: rawQuery, filters = {}, mode } = body;
 
-	if (!searchQuery?.trim()) {
-		return json({ results: [], total: 0, query: searchQuery, mode });
+	if (!rawQuery?.trim()) {
+		return json({ results: [], total: 0, query: rawQuery, mode });
 	}
 
+	const searchQuery = validateSearchQuery(rawQuery);
+	const { page, limit } = validatePaginationParams(body.page, body.limit);
 	const offset = (page - 1) * limit;
 
 	try {
@@ -98,10 +101,13 @@ async function fulltextSearch(
 
 	const whereClause = conditions.join(' AND ');
 
+	// Capped count: LIMIT 10001 avoids scanning all 961K rows for pagination
+	// Frontend displays "10,000+" when count equals 10001
 	const countSql = `
-		SELECT COUNT(*) as count
-		FROM documents
-		WHERE ${whereClause}
+		WITH capped AS (
+			SELECT 1 FROM documents WHERE ${whereClause} LIMIT 10001
+		)
+		SELECT COUNT(*) as count FROM capped
 	`;
 
 	const searchSql = `

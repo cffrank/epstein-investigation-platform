@@ -693,27 +693,26 @@ app.post('/process/batch', async (c) => {
 
     const results: Array<{ documentId: string; status: string; error?: string }> = [];
 
-    for (const doc of documents) {
+    // Process a single document (extracted for parallel execution)
+    async function processDocument(doc: { documentId: string; r2Key: string; source: string }): Promise<{ documentId: string; status: string; error?: string }> {
       try {
         // Get PDF from R2
         const object = await c.env.DOCUMENTS.get(doc.r2Key);
         if (!object) {
-          results.push({ documentId: doc.documentId, status: 'not_found' });
-          continue;
+          return { documentId: doc.documentId, status: 'not_found' };
         }
 
         // Read and encode PDF
         const pdfArrayBuffer = await object.arrayBuffer();
         if (pdfArrayBuffer.byteLength > 10 * 1024 * 1024) {
-          results.push({ documentId: doc.documentId, status: 'too_large' });
-          continue;
+          return { documentId: doc.documentId, status: 'too_large' };
         }
 
         const pdfBytes = new Uint8Array(pdfArrayBuffer);
         let pdfBinary = '';
-        const chunkSize = 32768;
-        for (let i = 0; i < pdfBytes.length; i += chunkSize) {
-          const chunk = pdfBytes.subarray(i, i + chunkSize);
+        const byteChunkSize = 32768;
+        for (let i = 0; i < pdfBytes.length; i += byteChunkSize) {
+          const chunk = pdfBytes.subarray(i, i + byteChunkSize);
           pdfBinary += String.fromCharCode.apply(null, [...chunk]);
         }
         const pdfBase64 = btoa(pdfBinary);
@@ -733,8 +732,7 @@ app.post('/process/batch', async (c) => {
         });
 
         if (!extractResponse.ok) {
-          results.push({ documentId: doc.documentId, status: 'extract_failed' });
-          continue;
+          return { documentId: doc.documentId, status: 'extract_failed' };
         }
 
         const { text } = await extractResponse.json() as { text: string };
@@ -775,14 +773,22 @@ app.post('/process/batch', async (c) => {
           }
         }
 
-        results.push({ documentId: doc.documentId, status: 'completed' });
+        return { documentId: doc.documentId, status: 'completed' };
       } catch (error) {
-        results.push({
+        return {
           documentId: doc.documentId,
           status: 'error',
           error: error instanceof Error ? error.message : 'Unknown error'
-        });
+        };
       }
+    }
+
+    // Process documents in parallel chunks of 5 (SEC-11)
+    const CHUNK_SIZE = 5;
+    for (let i = 0; i < documents.length; i += CHUNK_SIZE) {
+      const chunk = documents.slice(i, i + CHUNK_SIZE);
+      const chunkResults = await Promise.all(chunk.map(processDocument));
+      results.push(...chunkResults);
     }
 
     const completed = results.filter(r => r.status === 'completed').length;

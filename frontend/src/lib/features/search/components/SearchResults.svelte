@@ -4,6 +4,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { FileText } from '@lucide/svelte';
 	import { truncate } from '$lib/utils';
+	import { sanitizeSearchSnippet } from '$lib/utils/sanitize';
 
 	interface Props {
 		results: SearchResult[];
@@ -60,7 +61,7 @@
 								</span>
 							</div>
 							<div class="text-sm text-muted-foreground prose prose-sm max-w-none">
-								{@html result.snippet || truncate(result.filename, 200)}
+								{@html sanitizeSearchSnippet(result.snippet || truncate(result.filename, 200))}
 							</div>
 						</div>
 					</div>

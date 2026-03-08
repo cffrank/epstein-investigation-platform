@@ -3,6 +3,7 @@
 	import { cn } from '$lib/utils';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import { Search } from '@lucide/svelte';
+	import { sanitizeDocumentText } from '$lib/utils/sanitize';
 
 	let {
 		text,
@@ -173,7 +174,7 @@
 				'prose-p:whitespace-pre-wrap prose-p:leading-relaxed'
 			)}
 		>
-			{@html highlightedHtml}
+			{@html sanitizeDocumentText(highlightedHtml)}
 		</div>
 	</div>
 </div>

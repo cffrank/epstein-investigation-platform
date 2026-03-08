@@ -6,7 +6,7 @@
 INSTANCE_ID=${1:-1}
 BATCH_SIZE=${2:-25}
 WORKER_URL="https://epstein-api.carl-f-frank.workers.dev"
-API_KEY="test-api-key-12345"
+API_KEY="${API_SECRET_KEY:?ERROR: API_SECRET_KEY must be set}"
 BACKEND_URL="http://localhost:8080"  # nginx on the server
 LOG_FILE="/tmp/batch-processor-${INSTANCE_ID}.log"
 

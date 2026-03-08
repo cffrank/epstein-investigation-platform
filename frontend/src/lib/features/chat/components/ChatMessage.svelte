@@ -2,6 +2,7 @@
 	import type { ChatMessage } from '$lib/types';
 	import { Badge } from '$lib/components/ui/badge';
 	import { cn } from '$lib/utils';
+	import { sanitizeChatContent } from '$lib/utils/sanitize';
 
 	interface Props {
 		message: ChatMessage;
@@ -36,7 +37,7 @@
 			{#if message.role === 'user'}
 				{message.content}
 			{:else}
-				{@html renderContent(message.content)}
+				{@html sanitizeChatContent(renderContent(message.content))}
 			{/if}
 		</div>
 	</div>

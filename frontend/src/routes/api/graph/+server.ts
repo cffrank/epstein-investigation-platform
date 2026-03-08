@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { neo4jClient } from '$lib/server/neo4j';
+import { validateSearchQuery } from '@epstein/shared';
 
 interface CytoscapeElement {
 	data: {
@@ -33,10 +34,11 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	try {
 		switch (action) {
 			case 'search': {
-				const { query } = params;
-				if (!query || typeof query !== 'string') {
+				const { query: rawQuery } = params;
+				if (!rawQuery || typeof rawQuery !== 'string') {
 					return json({ error: 'Query required' }, { status: 400 });
 				}
+				const query = validateSearchQuery(rawQuery);
 
 				const result = await client.query(
 					`

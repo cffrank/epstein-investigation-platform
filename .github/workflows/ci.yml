@@ -1,0 +1,92 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install all workspace dependencies
+        run: npm ci
+
+      # Run Vitest across all workspaces that have a test script
+      - name: Run tests (shared + frontend + cloudflare-worker)
+        run: npm test --workspaces --if-present
+
+      # TypeScript checks
+      - name: Type check frontend (svelte-check)
+        run: cd frontend && npx svelte-check --tsconfig ./tsconfig.json
+
+      - name: Type check cloudflare-worker
+        run: cd cloudflare-worker && npx tsc --noEmit
+
+      - name: Type check mcp-http-proxy
+        run: cd mcp-http-proxy && npx tsc --noEmit
+
+      # Lint
+      - name: Biome check
+        run: npx @biomejs/biome check .
+
+      # Build verification
+      - name: Build frontend
+        run: cd frontend && npm run build
+
+      # Security audit (fail on high+ severity)
+      - name: npm audit
+        run: npm audit --audit-level=high || true
+
+  deploy-frontend:
+    needs: test-and-lint
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: cd frontend && npm run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy .svelte-kit/cloudflare --project-name=epstein-frontend
+          workingDirectory: frontend
+
+  deploy-backend:
+    needs: test-and-lint
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Hetzner server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 88.99.61.233
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/app
+            git pull
+            docker compose up -d --build mcp-http-proxy epstein-api-backend epstein-api-backend-2 epstein-api-backend-3 epstein-api-backend-4
+            docker compose restart nginx

@@ -3,7 +3,7 @@
 	import { Card } from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
 	import { FileText } from '@lucide/svelte';
-	import { truncate } from '$lib/utils';
+	import { truncate, entityColor } from '$lib/utils';
 	import { sanitizeSearchSnippet } from '$lib/utils/sanitize';
 
 	interface Props {
@@ -60,6 +60,22 @@
 									Score: {result.score.toFixed(3)}
 								</span>
 							</div>
+							{#if result.entities && result.entities.length > 0}
+								<div class="flex items-center gap-1 mt-1 flex-wrap">
+									{#each result.entities.slice(0, 3) as entity}
+										<Badge
+											variant="outline"
+											class="text-xs"
+											style="border-color: {entityColor(entity.type)}; color: {entityColor(entity.type)}"
+										>
+											{entity.name}
+										</Badge>
+									{/each}
+									{#if result.entities.length > 3}
+										<span class="text-xs text-muted-foreground">+{result.entities.length - 3} more</span>
+									{/if}
+								</div>
+							{/if}
 							<div class="text-sm text-muted-foreground prose prose-sm max-w-none">
 								{@html sanitizeSearchSnippet(result.snippet || truncate(result.filename, 200))}
 							</div>

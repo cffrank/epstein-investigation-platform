@@ -1,4 +1,4 @@
-import type { SearchResult, SearchMode, SearchResponse, SearchFilters } from '$lib/types';
+import type { SearchResult, SearchMode, SearchResponse, SearchFilters, EntityRef } from '$lib/types';
 
 class SearchStore {
 	query = $state('');
@@ -10,6 +10,7 @@ class SearchStore {
 	page = $state(1);
 	limit = $state(20);
 	filters = $state<SearchFilters>({});
+	selectedEntities = $state<EntityRef[]>([]);
 
 	async performSearch() {
 		if (!this.query.trim()) {
@@ -67,7 +68,43 @@ class SearchStore {
 	}
 
 	setFilters(f: SearchFilters) {
-		this.filters = f;
+		// Preserve entityIds from selectedEntities when filters come from sidebar
+		this.filters = {
+			...f,
+			entityIds: this.selectedEntities.length > 0
+				? this.selectedEntities.map((e) => e.id)
+				: undefined
+		};
+		this.page = 1;
+	}
+
+	addEntityFilter(entity: EntityRef) {
+		if (this.selectedEntities.some((e) => e.id === entity.id)) return;
+		this.selectedEntities = [...this.selectedEntities, entity];
+		this.filters = {
+			...this.filters,
+			entityIds: this.selectedEntities.map((e) => e.id)
+		};
+		this.page = 1;
+	}
+
+	removeEntityFilter(entityId: string) {
+		this.selectedEntities = this.selectedEntities.filter((e) => e.id !== entityId);
+		this.filters = {
+			...this.filters,
+			entityIds: this.selectedEntities.length > 0
+				? this.selectedEntities.map((e) => e.id)
+				: undefined
+		};
+		this.page = 1;
+	}
+
+	clearEntityFilters() {
+		this.selectedEntities = [];
+		this.filters = {
+			...this.filters,
+			entityIds: undefined
+		};
 		this.page = 1;
 	}
 

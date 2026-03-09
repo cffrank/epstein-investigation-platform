@@ -59,4 +59,107 @@ describe('parseSSE', () => {
 		expect(events).toHaveLength(1);
 		expect(events[0].data).toBe('valid');
 	});
+
+	it('parses tool_call events', async () => {
+		const stream = createStream([
+			'event: tool_call\ndata: {"id":"toolu_123","name":"search_documents"}\n\n',
+		]);
+		const events = await collectEvents(stream);
+		expect(events).toHaveLength(1);
+		expect(events[0].event).toBe('tool_call');
+		const data = JSON.parse(events[0].data);
+		expect(data.id).toBe('toolu_123');
+		expect(data.name).toBe('search_documents');
+	});
+
+	it('parses tool_result events', async () => {
+		const stream = createStream([
+			'event: tool_result\ndata: {"id":"toolu_123","status":"complete","resultCount":5}\n\n',
+		]);
+		const events = await collectEvents(stream);
+		expect(events).toHaveLength(1);
+		expect(events[0].event).toBe('tool_result');
+		const data = JSON.parse(events[0].data);
+		expect(data.status).toBe('complete');
+		expect(data.resultCount).toBe(5);
+	});
+
+	it('parses text_delta events', async () => {
+		const stream = createStream([
+			'event: text_delta\ndata: {"text":"Hello world"}\n\n',
+		]);
+		const events = await collectEvents(stream);
+		expect(events).toHaveLength(1);
+		expect(events[0].event).toBe('text_delta');
+		expect(JSON.parse(events[0].data).text).toBe('Hello world');
+	});
+
+	it('parses citations_delta events', async () => {
+		const citation = {
+			type: 'char_location',
+			cited_text: 'The document states...',
+			document_index: 0,
+			document_title: 'flight-log.pdf',
+			source: '/documents/abc-123',
+		};
+		const stream = createStream([
+			`event: citations_delta\ndata: {"citation":${JSON.stringify(citation)}}\n\n`,
+		]);
+		const events = await collectEvents(stream);
+		expect(events).toHaveLength(1);
+		expect(events[0].event).toBe('citations_delta');
+		const data = JSON.parse(events[0].data);
+		expect(data.citation.type).toBe('char_location');
+		expect(data.citation.source).toBe('/documents/abc-123');
+	});
+
+	it('parses error events', async () => {
+		const stream = createStream([
+			'event: error\ndata: {"message":"API rate limited"}\n\n',
+		]);
+		const events = await collectEvents(stream);
+		expect(events).toHaveLength(1);
+		expect(events[0].event).toBe('error');
+		expect(JSON.parse(events[0].data).message).toBe('API rate limited');
+	});
+
+	it('parses done events', async () => {
+		const stream = createStream([
+			'event: done\ndata: {"model":"claude-sonnet-4-6"}\n\n',
+		]);
+		const events = await collectEvents(stream);
+		expect(events).toHaveLength(1);
+		expect(events[0].event).toBe('done');
+	});
+
+	it('parses mixed event stream in correct order', async () => {
+		const stream = createStream([
+			'event: tool_call\ndata: {"id":"t1","name":"search_documents"}\n\n',
+			'event: tool_result\ndata: {"id":"t1","status":"complete","resultCount":3}\n\n',
+			'event: text_delta\ndata: {"text":"Based on "}\n\n',
+			'event: text_delta\ndata: {"text":"the documents..."}\n\n',
+			'event: citations_delta\ndata: {"citation":{"type":"char_location","cited_text":"test","document_index":0,"document_title":"doc.pdf","source":"/documents/x"}}\n\n',
+			'event: done\ndata: {}\n\n',
+		]);
+		const events = await collectEvents(stream);
+		expect(events).toHaveLength(6);
+		expect(events[0].event).toBe('tool_call');
+		expect(events[1].event).toBe('tool_result');
+		expect(events[2].event).toBe('text_delta');
+		expect(events[3].event).toBe('text_delta');
+		expect(events[4].event).toBe('citations_delta');
+		expect(events[5].event).toBe('done');
+	});
+
+	it('accumulates multiple text_delta events correctly', async () => {
+		const stream = createStream([
+			'event: text_delta\ndata: {"text":"Hello "}\n\n',
+			'event: text_delta\ndata: {"text":"world"}\n\n',
+			'event: text_delta\ndata: {"text":"!"}\n\n',
+		]);
+		const events = await collectEvents(stream);
+		expect(events).toHaveLength(3);
+		const fullText = events.map((e) => JSON.parse(e.data).text).join('');
+		expect(fullText).toBe('Hello world!');
+	});
 });

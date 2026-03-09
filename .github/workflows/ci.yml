@@ -19,6 +19,8 @@ jobs:
 
       - name: Install all workspace dependencies
         run: npm install --frozen-lockfile 2>/dev/null || npm install
+      - name: Ensure native bindings for Linux CI
+        run: cd frontend && npm install lightningcss-linux-x64-gnu 2>/dev/null || true
 
       # Run Vitest for workspaces that don't need external auth
       # cloudflare-worker tests require Wrangler auth (vitest-pool-workers remote proxy)

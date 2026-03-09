@@ -99,11 +99,12 @@ Plans:
   2. User can run Louvain community detection and see entity clusters color-coded in the graph visualization
   3. User can run betweenness centrality to identify bridge nodes and discover hidden connections (entity pairs sharing neighbors but lacking a direct edge)
   4. Algorithm results are pre-computed in batch and served from cache -- no on-demand GDS execution per request
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
+- [ ] 05-01-PLAN.md -- GDS plugin install, batch computation endpoint, algorithm result API actions
+- [ ] 05-02-PLAN.md -- Analysis sidebar UI, algorithm sections, hidden connections panel, store extensions
+- [ ] 05-03-PLAN.md -- GraphCanvas visualization enhancements (centrality sizing, community colors, bridge glow, legend)
 
 ### Phase 6: Timeline Visualization
 **Goal**: An investigator can explore a chronological view of events extracted from the document corpus, filtered by entity
@@ -143,6 +144,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 2. AI Chat with Tool Use | 4/4 | Complete | 2026-03-08 |
 | 3. Entity Dossier Pages | 4/4 | Complete | 2026-03-08 |
 | 4. Faceted Search and Export | 0/2 | Not started | - |
-| 5. Graph Analysis | 0/2 | Not started | - |
+| 5. Graph Analysis | 0/3 | Not started | - |
 | 6. Timeline Visualization | 0/1 | Not started | - |
 | 7. Document Analysis Pipelines | 0/1 | Not started | - |

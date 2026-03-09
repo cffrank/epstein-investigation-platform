@@ -130,3 +130,40 @@ export interface Citation {
 	excerpt: string;
 	score: number;
 }
+
+// Investigation notes for analyst observations on entities
+export interface InvestigationNote {
+	id: string;
+	entity_id: string;
+	content: string;
+	created_at: string;
+	updated_at: string;
+}
+
+// AI-generated entity biography
+export interface EntityBiography {
+	content: string;
+	generated_at: string;
+	model: string;
+	citations?: NativeCitation[];
+}
+
+// Timeline event for entity chronology
+export interface TimelineEvent {
+	id: string;
+	date: string;
+	description: string;
+	document_id: string | null;
+	document_name: string | null;
+	event_type: string;
+}
+
+// Extended entity profile for dossier page
+export interface EntityDossier extends EntityProfile {
+	aliases: string[];
+	document_count: number;
+	connection_count: number;
+	biography: EntityBiography | null;
+	notes: InvestigationNote[];
+	timeline_events: TimelineEvent[];
+}

@@ -3,9 +3,11 @@ import type { PageServerLoad } from './$types';
 import { neo4jClient } from '$lib/server/neo4j';
 import { query as dbQuery } from '$lib/server/db';
 import type {
-	EntityProfile,
 	EntityConnection,
 	EntityCoOccurrence,
+	EntityBiography,
+	InvestigationNote,
+	TimelineEvent,
 	Document,
 	EntityType
 } from '$lib/types';
@@ -25,19 +27,21 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		const neo4j = neo4jClient(platform);
 		const entityId = parseInt(id, 10);
 
-		// Fetch entity profile with connections
+		// Fetch entity profile with connections and aliases
 		const profileCypher = `
 			MATCH (e) WHERE id(e) = toInteger($id)
 			OPTIONAL MATCH (e)-[r]-(connected)
 			WHERE connected:Person OR connected:Organization OR connected:Location
+			WITH e, collect({
+			  id: id(connected),
+			  name: connected.name,
+			  type: labels(connected)[0],
+			  rel: type(r)
+			}) as connections
 			RETURN e.name as name,
 			       labels(e)[0] as type,
-			       collect({
-			         id: id(connected),
-			         name: connected.name,
-			         type: labels(connected)[0],
-			         rel: type(r)
-			       }) as connections
+			       e.aliases as aliases,
+			       connections
 		`;
 
 		const profileResult = await neo4j.query(profileCypher, { id: entityId });
@@ -46,7 +50,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 			throw error(404, 'Entity not found');
 		}
 
-		const [name, type, connectionsRaw] = profileResult.rows[0];
+		const [name, type, aliasesRaw, connectionsRaw] = profileResult.rows[0];
 
 		// Filter out null connections and map to proper type
 		const connections: EntityConnection[] = (connectionsRaw as Array<{
@@ -133,16 +137,88 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 			shared_docs: row[3] as number
 		}));
 
-		const profile: EntityProfile = {
+		// Fetch timeline events from Neo4j (Event nodes connected to entity)
+		let timeline_events: TimelineEvent[] = [];
+		try {
+			const timelineCypher = `
+				MATCH (e)-[:PARTICIPATED_IN|OCCURRED_AT|RELATED_TO]-(event:Event)
+				WHERE id(e) = toInteger($id)
+				RETURN id(event) as id, event.date as date, event.description as description,
+				       event.type as event_type, null as doc_id, null as doc_name
+				ORDER BY event.date
+				LIMIT 50
+			`;
+			const timelineResult = await neo4j.query(timelineCypher, { id: entityId });
+			timeline_events = timelineResult.rows.map((row) => ({
+				id: String(row[0]),
+				date: (row[1] as string) || '',
+				description: (row[2] as string) || '',
+				document_id: row[3] as string | null,
+				document_name: row[4] as string | null,
+				event_type: (row[5] as string) || 'event'
+			}));
+		} catch {
+			// Event nodes may not exist yet (Phase 6 creates them)
+			timeline_events = [];
+		}
+
+		// Fetch investigation notes from PostgreSQL
+		let notes: InvestigationNote[] = [];
+		try {
+			notes = await dbQuery<InvestigationNote>(
+				platform,
+				'SELECT id, entity_id, content, created_at, updated_at FROM investigation_notes WHERE entity_id = $1 ORDER BY created_at DESC',
+				[id]
+			);
+		} catch {
+			// Table may not exist yet
+			notes = [];
+		}
+
+		// Fetch cached biography from PostgreSQL entities table
+		let biography: EntityBiography | null = null;
+		try {
+			const bioResult = await dbQuery<{
+				description: string | null;
+				biography: string | null;
+				biography_generated_at: string | null;
+				biography_model: string | null;
+			}>(
+				platform,
+				`SELECT description, biography, biography_generated_at, biography_model
+				 FROM entities
+				 WHERE canonical_name ILIKE $1
+				 LIMIT 1`,
+				[name as string]
+			);
+			if (bioResult.length > 0 && bioResult[0].biography_generated_at) {
+				biography = {
+					content: bioResult[0].biography || bioResult[0].description || '',
+					generated_at: bioResult[0].biography_generated_at,
+					model: bioResult[0].biography_model || 'unknown',
+				};
+			}
+		} catch {
+			// Biography columns may not exist yet
+			biography = null;
+		}
+
+		const aliases = (aliasesRaw as string[] | null) || [];
+
+		return {
 			id,
 			name: name as string,
 			type: type as EntityType,
+			aliases,
 			connections,
 			documents,
-			co_occurrences
+			co_occurrences,
+			document_count: documents.length,
+			connection_count: connections.length,
+			biography,
+			notes,
+			timeline_events,
 		};
-
-		return profile;
 	} catch (err) {
 		console.error('Entity profile load error:', err);
 		if ((err as { status?: number }).status) {

@@ -19,6 +19,8 @@ jobs:
 
       - name: Install all workspace dependencies
         run: npm ci
+      - name: Install platform-specific optional deps
+        run: npm install --no-save lightningcss-linux-x64-gnu 2>/dev/null || true
 
       # Run Vitest for workspaces that don't need external auth
       # cloudflare-worker tests require Wrangler auth (vitest-pool-workers remote proxy)

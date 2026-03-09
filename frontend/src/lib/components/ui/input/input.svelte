@@ -9,7 +9,8 @@ type Props = WithElementRef<
 		({ type: "file"; files?: FileList } | { type?: InputType; files?: undefined })
 >;
 
-const {
+// biome-ignore lint/style/useConst: Svelte $bindable props must use let, not const
+let {
 	ref = $bindable(null),
 	value = $bindable(),
 	type,

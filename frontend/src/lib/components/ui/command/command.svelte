@@ -1,10 +1,12 @@
 <script lang="ts">
 import { cn } from "$lib/utils";
-import type { Command as CommandPrimitive } from "bits-ui";
+// biome-ignore lint/style/useImportType: bits-ui Primitive is used as runtime value in Svelte template
+import { Command as CommandPrimitive } from "bits-ui";
 
 export type CommandRootApi = CommandPrimitive.Root;
 
-const {
+// biome-ignore lint/style/useConst: Svelte $bindable props must use let, not const
+let {
 	api = $bindable(null),
 	ref = $bindable(null),
 	value = $bindable(""),

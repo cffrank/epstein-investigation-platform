@@ -1,8 +1,10 @@
 <script lang="ts">
 import { cn } from "$lib/utils";
-import type { Tabs as TabsPrimitive } from "bits-ui";
+// biome-ignore lint/style/useImportType: bits-ui Primitive is used as runtime value in Svelte template
+import { Tabs as TabsPrimitive } from "bits-ui";
 
-const { ref = $bindable(null), class: className, ...restProps }: TabsPrimitive.ListProps = $props();
+// biome-ignore lint/style/useConst: Svelte $bindable props must use let, not const
+let { ref = $bindable(null), class: className, ...restProps }: TabsPrimitive.ListProps = $props();
 </script>
 
 <TabsPrimitive.List

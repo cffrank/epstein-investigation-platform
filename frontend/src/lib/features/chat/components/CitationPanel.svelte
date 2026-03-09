@@ -9,7 +9,8 @@ interface Props {
 }
 
 const { citations }: Props = $props();
-const expanded = $state(true);
+// biome-ignore lint/style/useConst: Svelte $state variable is reassigned reactively
+let expanded = $state(true);
 
 // Deduplicate citations by source, keeping first occurrence
 const uniqueCitations = $derived(() => {

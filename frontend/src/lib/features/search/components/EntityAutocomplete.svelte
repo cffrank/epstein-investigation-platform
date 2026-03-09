@@ -18,7 +18,8 @@ let suggestions = $state<EntityRef[]>([]);
 let showDropdown = $state(false);
 let loading = $state(false);
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-const containerEl: HTMLDivElement | undefined = $state();
+// biome-ignore lint/style/useConst: Svelte $state variable is bound via bind:this
+let containerEl: HTMLDivElement | undefined = $state();
 
 function handleInput(event: Event) {
 	const target = event.target as HTMLInputElement;

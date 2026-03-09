@@ -33,7 +33,8 @@ const {
 	maxResults = 10,
 }: Props = $props();
 
-const showAll = $state(false);
+// biome-ignore lint/style/useConst: Svelte $state variable is reassigned reactively
+let showAll = $state(false);
 
 const displayResults = $derived(showAll ? results.slice(0, 25) : results.slice(0, maxResults));
 

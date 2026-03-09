@@ -9,7 +9,8 @@ const {
 	loading?: boolean;
 } = $props();
 
-const query = $state("");
+// biome-ignore lint/style/useConst: Svelte $state variable is bound via bind:value
+let query = $state("");
 const searchResults = $state<
 	Array<{ id: string; label: string; type: string; connections: number }>
 >([]);

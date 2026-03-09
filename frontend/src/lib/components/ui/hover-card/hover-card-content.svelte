@@ -1,10 +1,13 @@
 <script lang="ts">
 import { type WithoutChildrenOrChild, cn } from "$lib/utils";
-import type { LinkPreview as HoverCardPrimitive } from "bits-ui";
+// biome-ignore lint/style/useImportType: bits-ui Primitive is used as runtime value in Svelte template
+import { LinkPreview as HoverCardPrimitive } from "bits-ui";
 import type { ComponentProps } from "svelte";
-import type HoverCardPortal from "./hover-card-portal.svelte";
+// biome-ignore lint/style/useImportType: Svelte component used as runtime value in template
+import HoverCardPortal from "./hover-card-portal.svelte";
 
-const {
+// biome-ignore lint/style/useConst: Svelte $bindable props must use let, not const
+let {
 	ref = $bindable(null),
 	class: className,
 	align = "center",

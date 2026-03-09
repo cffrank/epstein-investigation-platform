@@ -1,9 +1,11 @@
 <script lang="ts">
 import { type WithoutChildrenOrChild, cn } from "$lib/utils";
 import GripVerticalIcon from "@lucide/svelte/icons/grip-vertical";
-import type * as ResizablePrimitive from "paneforge";
+// biome-ignore lint/style/useImportType: paneforge Primitive is used as runtime value in Svelte template
+import * as ResizablePrimitive from "paneforge";
 
-const {
+// biome-ignore lint/style/useConst: Svelte $bindable props must use let, not const
+let {
 	ref = $bindable(null),
 	class: className,
 	withHandle = false,

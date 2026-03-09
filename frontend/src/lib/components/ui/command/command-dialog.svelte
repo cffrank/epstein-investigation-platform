@@ -1,11 +1,13 @@
 <script lang="ts">
 import * as Dialog from "$lib/components/ui/dialog/index.js";
 import type { WithoutChildrenOrChild } from "$lib/utils";
-import type { Command as CommandPrimitive, Dialog as DialogPrimitive } from "bits-ui";
+// biome-ignore lint/style/useImportType: bits-ui Primitive is used as runtime value in Svelte template
+import { Command as CommandPrimitive, Dialog as DialogPrimitive } from "bits-ui";
 import type { Snippet } from "svelte";
 import Command from "./command.svelte";
 
-const {
+// biome-ignore lint/style/useConst: Svelte $bindable props must use let, not const
+let {
 	open = $bindable(false),
 	ref = $bindable(null),
 	value = $bindable(""),

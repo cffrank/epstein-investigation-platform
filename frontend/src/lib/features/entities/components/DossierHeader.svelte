@@ -16,7 +16,8 @@ interface Props {
 
 const { name, type, aliases, documentCount, connectionCount }: Props = $props();
 
-const showAllAliases = $state(false);
+// biome-ignore lint/style/useConst: Svelte $state variable is reassigned reactively
+let showAllAliases = $state(false);
 const MAX_VISIBLE_ALIASES = 3;
 
 const visibleAliases = $derived(showAllAliases ? aliases : aliases.slice(0, MAX_VISIBLE_ALIASES));

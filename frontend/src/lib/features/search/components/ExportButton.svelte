@@ -14,7 +14,8 @@ const { query, mode, filters, disabled = false }: Props = $props();
 
 let showMenu = $state(false);
 let exporting = $state(false);
-const containerEl: HTMLDivElement | undefined = $state();
+// biome-ignore lint/style/useConst: Svelte $state variable is bound via bind:this
+let containerEl: HTMLDivElement | undefined = $state();
 
 function handleClickOutside(event: MouseEvent) {
 	if (containerEl && !containerEl.contains(event.target as Node)) {

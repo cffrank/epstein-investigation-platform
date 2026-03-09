@@ -2,7 +2,8 @@
 import { Badge } from "$lib/components/ui/badge";
 import { Button } from "$lib/components/ui/button";
 import AnalysisSidebar from "$lib/features/graph/components/AnalysisSidebar.svelte";
-import type GraphCanvas from "$lib/features/graph/components/GraphCanvas.svelte";
+// biome-ignore lint/style/useImportType: Svelte component used as runtime value in template
+import GraphCanvas from "$lib/features/graph/components/GraphCanvas.svelte";
 import GraphControls from "$lib/features/graph/components/GraphControls.svelte";
 import GraphLegend from "$lib/features/graph/components/GraphLegend.svelte";
 import GraphSearch from "$lib/features/graph/components/GraphSearch.svelte";
@@ -11,7 +12,8 @@ import { entityColor } from "$lib/utils";
 import { ExternalLink, X } from "@lucide/svelte";
 import { onMount } from "svelte";
 
-const canvasRef: GraphCanvas | null = null;
+// biome-ignore lint/style/useConst: variable is reassigned via bind:this in Svelte template
+let canvasRef: GraphCanvas | null = null;
 
 const elements = $derived(graphStore.getElements());
 const selectedNode = $derived(graphStore.getSelectedNode());
@@ -67,7 +69,7 @@ onMount(() => {
 	<div class="relative flex-1 overflow-hidden">
 	<GraphCanvas
 		bind:this={canvasRef}
-		bind:elements
+		{elements}
 		{selectedNode}
 		{colorMode}
 		{communitySizes}

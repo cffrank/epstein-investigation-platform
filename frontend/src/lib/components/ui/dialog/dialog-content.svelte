@@ -1,13 +1,16 @@
 <script lang="ts">
 import { type WithoutChildrenOrChild, cn } from "$lib/utils";
 import XIcon from "@lucide/svelte/icons/x";
-import type { Dialog as DialogPrimitive } from "bits-ui";
+// biome-ignore lint/style/useImportType: bits-ui Primitive is used as runtime value in Svelte template
+import { Dialog as DialogPrimitive } from "bits-ui";
 import type { Snippet } from "svelte";
 import type { ComponentProps } from "svelte";
-import type DialogPortal from "./dialog-portal.svelte";
+// biome-ignore lint/style/useImportType: Svelte component used as runtime value in template
+import DialogPortal from "./dialog-portal.svelte";
 import * as Dialog from "./index.js";
 
-const {
+// biome-ignore lint/style/useConst: Svelte $bindable props must use let, not const
+let {
 	ref = $bindable(null),
 	class: className,
 	portalProps,

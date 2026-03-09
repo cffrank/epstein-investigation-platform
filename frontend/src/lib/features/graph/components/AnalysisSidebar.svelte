@@ -21,7 +21,8 @@ const communityResults = $derived(graphStore.getCommunityResults());
 const bridgeResults = $derived(graphStore.getBridgeResults());
 const hiddenConnections = $derived(graphStore.getHiddenConnections());
 
-const accordionValue = $state<string>("");
+// biome-ignore lint/style/useConst: Svelte $state variable is bound via bind:value
+let accordionValue = $state<string>("");
 
 function relativeTime(dateStr: string | null): string {
 	if (!dateStr) return "Not yet computed";

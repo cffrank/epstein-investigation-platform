@@ -10,7 +10,8 @@ interface Props {
 }
 
 const { initialContent = "", onSave, onCancel, saving = false }: Props = $props();
-const content = $state(initialContent);
+// biome-ignore lint/style/useConst: Svelte $state variable is bound via bind:value
+let content = $state(initialContent);
 </script>
 
 <div class="space-y-2">

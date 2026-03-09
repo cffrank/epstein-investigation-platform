@@ -15,7 +15,8 @@ const {
 	searchTerm?: string;
 } = $props();
 
-const localSearchTerm = $state("");
+// biome-ignore lint/style/useConst: Svelte $state variable is bound via bind:value
+let localSearchTerm = $state("");
 let currentMatchIndex = $state(0);
 
 const entityColors: Record<string, string> = {

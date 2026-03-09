@@ -103,9 +103,9 @@ onMount(async () => {
 					"text-max-width": "80px",
 					width: (ele: cytoscape.NodeSingular) => {
 						const pagerank = ele.data("pagerank");
-						if (pagerank != null) {
+						if (pagerank != null && cy) {
 							const allPr = cy
-								?.nodes()
+								.nodes()
 								.map((n: cytoscape.NodeSingular) => n.data("pagerank"))
 								.filter((v: unknown): v is number => v != null);
 							const maxPr = Math.max(...allPr, 0.001);
@@ -117,9 +117,9 @@ onMount(async () => {
 					},
 					height: (ele: cytoscape.NodeSingular) => {
 						const pagerank = ele.data("pagerank");
-						if (pagerank != null) {
+						if (pagerank != null && cy) {
 							const allPr = cy
-								?.nodes()
+								.nodes()
 								.map((n: cytoscape.NodeSingular) => n.data("pagerank"))
 								.filter((v: unknown): v is number => v != null);
 							const maxPr = Math.max(...allPr, 0.001);
@@ -149,9 +149,9 @@ onMount(async () => {
 				style: {
 					"underlay-color": ((ele: cytoscape.NodeSingular) => {
 						const betweenness = ele.data("betweenness");
-						if (betweenness == null) return "transparent";
+						if (betweenness == null || !cy) return "transparent";
 						const allB = cy
-							?.nodes()
+							.nodes()
 							.map((n: cytoscape.NodeSingular) => n.data("betweenness"))
 							.filter((v: unknown): v is number => v != null);
 						const maxB = Math.max(...allB, 0.001);

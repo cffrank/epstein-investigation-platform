@@ -7,7 +7,8 @@ interface Props {
 }
 
 const { toolCalls }: Props = $props();
-const expanded = $state(false);
+// biome-ignore lint/style/useConst: Svelte $state variable is reassigned reactively
+let expanded = $state(false);
 
 const toolLabels: Record<string, string> = {
 	search_documents: "Searching documents",

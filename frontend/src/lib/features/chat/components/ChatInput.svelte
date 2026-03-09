@@ -9,7 +9,8 @@ interface Props {
 	oninput: (value: string) => void;
 }
 
-const { value = $bindable(), disabled = false, onsubmit, oninput }: Props = $props();
+// biome-ignore lint/style/useConst: Svelte $bindable props must use let, not const
+let { value = $bindable(), disabled = false, onsubmit, oninput }: Props = $props();
 
 function handleKeydown(e: KeyboardEvent) {
 	if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {

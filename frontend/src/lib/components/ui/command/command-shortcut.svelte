@@ -2,7 +2,8 @@
 import { type WithElementRef, cn } from "$lib/utils";
 import type { HTMLAttributes } from "svelte/elements";
 
-const {
+// biome-ignore lint/style/useConst: Svelte $bindable props must use let, not const
+let {
 	ref = $bindable(null),
 	class: className,
 	children,

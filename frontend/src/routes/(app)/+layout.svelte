@@ -7,7 +7,8 @@ import * as Sheet from "$lib/components/ui/sheet";
 import { FileText, Menu } from "@lucide/svelte";
 
 const { children } = $props();
-const sidebarCollapsed = $state(false);
+// biome-ignore lint/style/useConst: Svelte $state variable is reassigned reactively
+let sidebarCollapsed = $state(false);
 let mobileOpen = $state(false);
 
 // Close mobile nav on navigation

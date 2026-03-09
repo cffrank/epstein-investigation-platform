@@ -20,9 +20,10 @@ jobs:
       - name: Install all workspace dependencies
         run: npm ci
 
-      # Run Vitest across all workspaces that have a test script
-      - name: Run tests (shared + frontend + cloudflare-worker)
-        run: npm test --workspaces --if-present
+      # Run Vitest for workspaces that don't need external auth
+      # cloudflare-worker tests require Wrangler auth (vitest-pool-workers remote proxy)
+      - name: Run tests (shared + frontend)
+        run: npm test -w @epstein/shared -w frontend --if-present
 
       # TypeScript checks
       - name: Type check frontend (svelte-check)

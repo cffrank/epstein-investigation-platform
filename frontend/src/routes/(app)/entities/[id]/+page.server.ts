@@ -167,7 +167,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		try {
 			notes = await dbQuery<InvestigationNote>(
 				platform,
-				'SELECT id, entity_id, content, created_at, updated_at FROM investigation_notes WHERE entity_id = $1 ORDER BY created_at DESC',
+				'SELECT id, entity_id, content, created_at, updated_at FROM entity_notes WHERE entity_id = $1 ORDER BY created_at DESC',
 				[id]
 			);
 		} catch {

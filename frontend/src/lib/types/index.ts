@@ -31,6 +31,23 @@ export interface SearchResponse {
 
 export type SearchMode = 'fulltext' | 'semantic' | 'hybrid';
 
+export interface SearchFilters {
+	dateRange?: [string, string];
+	sources?: string[];
+	docTypes?: string[];
+	classifications?: string[];
+	entityIds?: string[];
+}
+
+export interface SavedSearch {
+	id: string;
+	name: string;
+	query: string;
+	mode: SearchMode;
+	filters: SearchFilters;
+	createdAt: string;
+}
+
 export interface Entity {
 	id: string;
 	name: string;

@@ -2,15 +2,8 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { query as dbQuery } from '$lib/server/db';
 import { qdrantClient } from '$lib/server/qdrant';
-import type { SearchResult, SearchMode } from '$lib/types';
+import type { SearchResult, SearchMode, SearchFilters } from '$lib/types';
 import { validateSearchQuery, validatePaginationParams } from '@epstein/shared';
-
-interface SearchFilters {
-	dateRange?: [string, string];
-	sources?: string[];
-	docTypes?: string[];
-	classifications?: string[];
-}
 
 interface SearchRequest {
 	query: string;

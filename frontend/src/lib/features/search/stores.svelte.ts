@@ -1,10 +1,4 @@
-import type { SearchResult, SearchMode, SearchResponse } from '$lib/types';
-
-interface SearchFilters {
-	dateRange?: [string, string];
-	sources?: string[];
-	docTypes?: string[];
-}
+import type { SearchResult, SearchMode, SearchResponse, SearchFilters } from '$lib/types';
 
 class SearchStore {
 	query = $state('');

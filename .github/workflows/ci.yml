@@ -17,9 +17,7 @@ jobs:
           node-version: '22'
 
       - name: Install all workspace dependencies
-        run: npm ci
-      - name: Fix native binding resolution (npm/cli#4828)
-        run: cd frontend && rm -rf node_modules && npm install --prefer-offline
+        run: rm -rf node_modules frontend/node_modules && npm install
 
       # Run Vitest for workspaces that don't need external auth
       # cloudflare-worker tests require Wrangler auth (vitest-pool-workers remote proxy)

@@ -84,10 +84,11 @@ Plans:
   2. User can filter search results by date range using presets (year, decade) or a custom date picker
   3. User can save a search query with all active filters and re-execute it from a saved searches list
   4. User can export the current search result set to CSV or JSON and download the file
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 04-01: TBD
+- [ ] 04-01-PLAN.md -- Backend: entity filter SQL, entity badge population, autocomplete API, export API, DB indexes
+- [ ] 04-02-PLAN.md -- Frontend: entity autocomplete, entity badges, saved searches, export button, search page wiring
 
 ### Phase 5: Graph Analysis
 **Goal**: An investigator can run graph algorithms to identify influential entities, communities, bridge nodes, and hidden connections -- with results visually reflected in the graph
@@ -141,7 +142,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | 1. Security and Foundation | 4/4 | Complete | 2026-03-07 |
 | 2. AI Chat with Tool Use | 4/4 | Complete | 2026-03-08 |
 | 3. Entity Dossier Pages | 4/4 | Complete | 2026-03-08 |
-| 4. Faceted Search and Export | 0/1 | Not started | - |
+| 4. Faceted Search and Export | 0/2 | Not started | - |
 | 5. Graph Analysis | 0/2 | Not started | - |
 | 6. Timeline Visualization | 0/1 | Not started | - |
 | 7. Document Analysis Pipelines | 0/1 | Not started | - |

@@ -3,6 +3,7 @@
 	import GraphCanvas from '$lib/features/graph/components/GraphCanvas.svelte';
 	import GraphControls from '$lib/features/graph/components/GraphControls.svelte';
 	import GraphSearch from '$lib/features/graph/components/GraphSearch.svelte';
+	import AnalysisSidebar from '$lib/features/graph/components/AnalysisSidebar.svelte';
 	import * as graphStore from '$lib/features/graph/stores.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -57,7 +58,10 @@
 	});
 </script>
 
-<div class="relative h-[calc(100vh-0px)] w-full overflow-hidden">
+<div class="flex h-[calc(100vh-0px)] w-full overflow-hidden">
+	<AnalysisSidebar />
+
+	<div class="relative flex-1 overflow-hidden">
 	<GraphCanvas
 		bind:this={canvasRef}
 		bind:elements
@@ -129,4 +133,5 @@
 			</div>
 		</div>
 	{/if}
+	</div>
 </div>

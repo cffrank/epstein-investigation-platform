@@ -4,6 +4,7 @@
 	import GraphControls from '$lib/features/graph/components/GraphControls.svelte';
 	import GraphSearch from '$lib/features/graph/components/GraphSearch.svelte';
 	import AnalysisSidebar from '$lib/features/graph/components/AnalysisSidebar.svelte';
+	import GraphLegend from '$lib/features/graph/components/GraphLegend.svelte';
 	import * as graphStore from '$lib/features/graph/stores.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -17,6 +18,8 @@
 	let loading = $derived(graphStore.getLoading());
 	let error = $derived(graphStore.getError());
 	let stats = $derived(graphStore.getStats());
+	let colorMode = $derived(graphStore.getColorMode());
+	let communitySizes = $derived(graphStore.getCommunitySizes());
 
 	// Get selected node details from elements
 	let selectedNodeData = $derived.by(() => {
@@ -66,8 +69,12 @@
 		bind:this={canvasRef}
 		bind:elements
 		{selectedNode}
+		{colorMode}
+		{communitySizes}
 		onNodeTap={handleNodeTap}
 	/>
+
+	<GraphLegend {colorMode} {communitySizes} />
 
 	<GraphSearch onSearch={handleSearch} {loading} />
 

@@ -2,8 +2,14 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { query as dbQuery } from '$lib/server/db';
 import { qdrantClient } from '$lib/server/qdrant';
-import type { SearchResult, SearchMode, SearchFilters } from '$lib/types';
+import type { SearchResult, SearchMode, SearchFilters, EntityRef, EntityType } from '$lib/types';
 import { validateSearchQuery, validatePaginationParams } from '@epstein/shared';
+
+const ENTITY_TYPE_MAP: Record<string, EntityType> = {
+	person: 'Person',
+	organization: 'Organization',
+	location: 'Location'
+};
 
 interface SearchRequest {
 	query: string;
@@ -45,6 +51,11 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 			const data = await hybridSearch(platform, searchQuery, filters, limit, offset);
 			results = data.results;
 			total = data.total;
+		}
+
+		// Populate entity badges on results
+		if (results.length > 0) {
+			results = await populateEntities(platform, results);
 		}
 
 		return json({ results, total, query: searchQuery, mode });
@@ -89,6 +100,17 @@ async function fulltextSearch(
 		paramIndex++;
 		conditions.push(`created_at <= $${paramIndex}`);
 		params.push(filters.dateRange[1]);
+		paramIndex++;
+	}
+
+	if (filters.entityIds?.length) {
+		conditions.push(`id IN (
+			SELECT de.document_id FROM document_entities de
+			WHERE de.entity_id = ANY($${paramIndex})
+			GROUP BY de.document_id
+			HAVING COUNT(DISTINCT de.entity_id) = ${filters.entityIds.length}
+		)`);
+		params.push(filters.entityIds);
 		paramIndex++;
 	}
 
@@ -183,10 +205,11 @@ async function semanticSearch(
 	};
 	const embedding = embeddingData.data[0].embedding;
 
-	// Search Qdrant
+	// Search Qdrant -- fetch 3x when entity filters are active to compensate for post-filtering
 	const qdrant = qdrantClient(platform);
+	const qdrantLimit = filters.entityIds?.length ? (limit + offset) * 3 : limit + offset;
 	const searchResults = await qdrant.search(embedding, {
-		limit: limit + offset,
+		limit: qdrantLimit,
 		with_payload: true
 	});
 
@@ -225,6 +248,17 @@ async function semanticSearch(
 		paramIndex++;
 		conditions.push(`created_at <= $${paramIndex}`);
 		params.push(filters.dateRange[1]);
+		paramIndex++;
+	}
+
+	if (filters.entityIds?.length) {
+		conditions.push(`id IN (
+			SELECT de.document_id FROM document_entities de
+			WHERE de.entity_id = ANY($${paramIndex})
+			GROUP BY de.document_id
+			HAVING COUNT(DISTINCT de.entity_id) = ${filters.entityIds.length}
+		)`);
+		params.push(filters.entityIds);
 		paramIndex++;
 	}
 
@@ -326,4 +360,47 @@ async function hybridSearch(
 	const total = merged.length;
 
 	return { results, total };
+}
+
+/**
+ * Batch-fetch entities for a set of search results and attach them as badges.
+ * Replaces the hardcoded `entities: []` on each result.
+ */
+async function populateEntities(
+	platform: App.Platform,
+	results: SearchResult[]
+): Promise<SearchResult[]> {
+	const docIds = results.map((r) => r.id);
+
+	const entityRows = await dbQuery<{
+		document_id: string;
+		id: string;
+		name: string;
+		type: string;
+	}>(
+		platform,
+		`SELECT de.document_id, e.id, e.canonical_name as name, e.entity_type as type
+		FROM document_entities de
+		JOIN entities e ON e.id = de.entity_id
+		WHERE de.document_id = ANY($1)
+		ORDER BY de.mention_count DESC`,
+		[docIds]
+	);
+
+	// Group entities by document_id
+	const entityMap = new Map<string, EntityRef[]>();
+	for (const row of entityRows) {
+		const refs = entityMap.get(row.document_id) ?? [];
+		refs.push({
+			id: row.id,
+			name: row.name,
+			type: ENTITY_TYPE_MAP[row.type.toLowerCase()] ?? 'Person'
+		});
+		entityMap.set(row.document_id, refs);
+	}
+
+	return results.map((r) => ({
+		...r,
+		entities: entityMap.get(r.id) ?? []
+	}));
 }

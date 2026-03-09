@@ -9,6 +9,9 @@ interface CytoscapeElement {
 		label: string;
 		type: string;
 		connections?: number;
+		pagerank?: number;
+		communityId?: number;
+		betweenness?: number;
 	};
 }
 
@@ -45,7 +48,10 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 					MATCH (n)
 					WHERE (n:Person OR n:Organization OR n:Location)
 					  AND toLower(n.name) CONTAINS toLower($query)
-					RETURN id(n) as id, labels(n)[0] as type, n.name as name, COUNT { (n)--() } as connections
+					RETURN id(n) as id, labels(n)[0] as type, n.name as name,
+					       COUNT { (n)--() } as connections,
+					       n.pagerank as pagerank, n.communityId as communityId,
+					       n.betweenness as betweenness
 					ORDER BY connections DESC
 					LIMIT 20
 					`,
@@ -57,7 +63,10 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 						id: String(row[0]),
 						type: row[1] as string,
 						label: row[2] as string,
-						connections: row[3] as number
+						connections: row[3] as number,
+						...(row[4] != null && { pagerank: row[4] as number }),
+						...(row[5] != null && { communityId: row[5] as number }),
+						...(row[6] != null && { betweenness: row[6] as number })
 					}
 				}));
 
@@ -75,7 +84,9 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 					MATCH (n)-[r]-(m)
 					WHERE id(n) = toInteger($nodeId)
 					RETURN id(n) as sourceId, id(m) as targetId, labels(m)[0] as targetType,
-					       m.name as targetName, type(r) as relType, properties(r) as relProps
+					       m.name as targetName, type(r) as relType, properties(r) as relProps,
+					       m.pagerank as pagerank, m.communityId as communityId,
+					       m.betweenness as betweenness
 					LIMIT 50
 					`,
 					{ nodeId }
@@ -97,7 +108,10 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 							data: {
 								id: targetId,
 								label: targetName,
-								type: targetType
+								type: targetType,
+								...(row[6] != null && { pagerank: row[6] as number }),
+								...(row[7] != null && { communityId: row[7] as number }),
+								...(row[8] != null && { betweenness: row[8] as number })
 							}
 						});
 					}
@@ -116,6 +130,139 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 				return json({
 					nodes: Array.from(nodeMap.values()),
 					edges
+				});
+			}
+
+			case 'pagerank': {
+				const limit = params.limit ?? 25;
+				const result = await client.query(
+					`MATCH (n)
+					 WHERE n.pagerank IS NOT NULL
+					 RETURN id(n) as id, labels(n)[0] as type, n.name as name,
+					        n.pagerank as pagerank, n.communityId as communityId,
+					        n.betweenness as betweenness, COUNT { (n)--() } as connections
+					 ORDER BY n.pagerank DESC
+					 LIMIT $limit`,
+					{ limit }
+				);
+
+				const results = result.rows.map((row) => ({
+					id: String(row[0]),
+					type: row[1] as string,
+					name: row[2] as string,
+					pagerank: row[3] as number,
+					communityId: row[4] as number | null,
+					betweenness: row[5] as number | null,
+					connections: row[6] as number
+				}));
+
+				return json({ results });
+			}
+
+			case 'communities': {
+				const limit = params.limit ?? 25;
+				const result = await client.query(
+					`MATCH (n)
+					 WHERE n.communityId IS NOT NULL
+					 RETURN id(n) as id, labels(n)[0] as type, n.name as name,
+					        n.communityId as communityId, n.pagerank as pagerank,
+					        n.betweenness as betweenness, COUNT { (n)--() } as connections
+					 ORDER BY n.pagerank DESC
+					 LIMIT $limit`,
+					{ limit }
+				);
+
+				const results = result.rows.map((row) => ({
+					id: String(row[0]),
+					type: row[1] as string,
+					name: row[2] as string,
+					communityId: row[3] as number,
+					pagerank: row[4] as number | null,
+					betweenness: row[5] as number | null,
+					connections: row[6] as number
+				}));
+
+				const sizeResult = await client.query(
+					`MATCH (n)
+					 WHERE n.communityId IS NOT NULL
+					 RETURN n.communityId as communityId, count(*) as size
+					 ORDER BY size DESC
+					 LIMIT 8`
+				);
+
+				const communitySizes = sizeResult.rows.map((row) => ({
+					communityId: row[0] as number,
+					size: row[1] as number
+				}));
+
+				return json({ results, communitySizes });
+			}
+
+			case 'bridges': {
+				const limit = params.limit ?? 25;
+				const result = await client.query(
+					`MATCH (n)
+					 WHERE n.betweenness IS NOT NULL
+					 RETURN id(n) as id, labels(n)[0] as type, n.name as name,
+					        n.betweenness as betweenness, n.pagerank as pagerank,
+					        n.communityId as communityId, COUNT { (n)--() } as connections
+					 ORDER BY n.betweenness DESC
+					 LIMIT $limit`,
+					{ limit }
+				);
+
+				const results = result.rows.map((row) => ({
+					id: String(row[0]),
+					type: row[1] as string,
+					name: row[2] as string,
+					betweenness: row[3] as number,
+					pagerank: row[4] as number | null,
+					communityId: row[5] as number | null,
+					connections: row[6] as number
+				}));
+
+				return json({ results });
+			}
+
+			case 'hidden-connections': {
+				const result = await client.query(
+					`MATCH (a:Person)-[]->(shared)<-[]-(b:Person)
+					 WHERE NOT (a)-[]-(b) AND id(a) < id(b)
+					 WITH a, b, collect(DISTINCT shared) as sharedNodes, count(DISTINCT shared) as cnt
+					 WHERE cnt >= 3
+					 RETURN id(a) as personAId, a.name as personAName,
+					        id(b) as personBId, b.name as personBName,
+					        cnt as sharedCount,
+					        [s IN sharedNodes[0..10] | {id: id(s), name: s.name, type: labels(s)[0]}] as topSharedNeighbors
+					 ORDER BY cnt DESC
+					 LIMIT 20`
+				);
+
+				const pairs = result.rows.map((row) => ({
+					personAId: String(row[0]),
+					personAName: row[1] as string,
+					personBId: String(row[2]),
+					personBName: row[3] as string,
+					sharedCount: row[4] as number,
+					topSharedNeighbors: row[5] as Array<{ id: number; name: string; type: string }>
+				}));
+
+				return json({ pairs });
+			}
+
+			case 'algorithm-status': {
+				const metaResult = await client.query(
+					`OPTIONAL MATCH (m:Metadata {key: 'algorithm_last_computed'})
+					 RETURN m.value as lastComputed`
+				);
+
+				const countResult = await client.query(
+					`MATCH (n) WHERE n.pagerank IS NOT NULL RETURN count(n) as count`
+				);
+
+				return json({
+					lastComputed: (metaResult.rows[0]?.[0] as string) ?? null,
+					nodeCount: (countResult.rows[0]?.[0] as number) ?? 0
 				});
 			}
 

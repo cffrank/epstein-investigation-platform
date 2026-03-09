@@ -78,8 +78,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed backend files
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD)
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED" | grep -q 'docker-compose.yml' && echo "compose_changed=true" >> $GITHUB_OUTPUT || echo "compose_changed=false" >> $GITHUB_OUTPUT
+          echo "$CHANGED" | grep -qE '(cloudflare-worker|mcp-http-proxy|config/|scripts/|docker-compose)' && echo "backend_changed=true" >> $GITHUB_OUTPUT || echo "backend_changed=false" >> $GITHUB_OUTPUT
 
       - name: Deploy to Hetzner server
+        if: steps.changes.outputs.backend_changed == 'true'
         uses: appleboy/ssh-action@v1
         with:
           host: 88.99.61.233
@@ -88,5 +101,17 @@ jobs:
           script: |
             cd /opt/app
             git pull
+
+            # Rebuild API backends and proxy
             docker compose up -d --build mcp-http-proxy epstein-api-backend epstein-api-backend-2 epstein-api-backend-3 epstein-api-backend-4
-            docker compose restart nginx
+
+            # Restart infra services if docker-compose.yml changed
+            if [ "${{ steps.changes.outputs.compose_changed }}" = "true" ]; then
+              docker compose up -d neo4j redis nginx
+            else
+              docker compose restart nginx
+            fi
+
+            # Health check
+            sleep 5
+            curl -sf http://localhost:8080/health || echo "WARNING: health check failed"

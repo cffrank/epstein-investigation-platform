@@ -22,6 +22,7 @@
 		"@types/cytoscape": "^3.21.9",
 		"@types/dompurify": "^3.0.5",
 		"jsdom": "^28.1.0",
+		"lightningcss": "^1.30.2",
 		"svelte": "^5.49.2",
 		"svelte-check": "^4.3.6",
 		"tailwindcss": "^4.1.18",

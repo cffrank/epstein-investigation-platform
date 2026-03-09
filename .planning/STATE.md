@@ -61,5 +61,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-08
-Stopped at: Phase 2 complete, ready for Phase 3
-Resume file: .planning/phases/02-ai-chat-with-tool-use/02-04-SUMMARY.md
+Stopped at: Phase 3 context gathered
+Resume file: .planning/phases/03-entity-dossier-pages/03-CONTEXT.md

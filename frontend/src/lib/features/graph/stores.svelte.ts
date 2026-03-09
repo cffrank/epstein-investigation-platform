@@ -59,13 +59,13 @@ interface GraphResponse {
 
 // Existing core state
 let elements = $state<Array<CytoscapeElement | CytoscapeEdge>>([]);
-let expandedNodes = $state<Set<string>>(new Set());
+const expandedNodes = $state<Set<string>>(new Set());
 let selectedNode = $state<string | null>(null);
 let loading = $state(false);
 let error = $state<string | null>(null);
 
 // Algorithm state
-let colorMode = $state<'type' | 'community'>('type');
+let colorMode = $state<"type" | "community">("type");
 let pagerankResults = $state<AlgorithmResult[]>([]);
 let communityResults = $state<AlgorithmResult[]>([]);
 let communitySizes = $state<CommunitySizeEntry[]>([]);
@@ -73,24 +73,24 @@ let bridgeResults = $state<AlgorithmResult[]>([]);
 let hiddenConnections = $state<HiddenConnectionPair[]>([]);
 let algorithmStatus = $state<{ lastComputed: string | null; nodeCount: number }>({
 	lastComputed: null,
-	nodeCount: 0
+	nodeCount: 0,
 });
 let computing = $state(false);
 let activeAlgorithm = $state<string | null>(null);
 
 async function callGraphApi(
 	action: string,
-	params: Record<string, unknown>
+	params: Record<string, unknown>,
 ): Promise<GraphResponse> {
-	const response = await fetch('/api/graph', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ action, ...params })
+	const response = await fetch("/api/graph", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ action, ...params }),
 	});
 
 	if (!response.ok) {
 		const data = await response.json();
-		throw new Error(data.error || 'Graph API request failed');
+		throw new Error(data.error || "Graph API request failed");
 	}
 
 	return response.json();
@@ -102,7 +102,7 @@ export function searchEntities(query: string) {
 	loading = true;
 	error = null;
 
-	callGraphApi('search', { query })
+	callGraphApi("search", { query })
 		.then((data) => {
 			if (data.error) {
 				error = data.error;
@@ -114,7 +114,7 @@ export function searchEntities(query: string) {
 		})
 		.catch((err) => {
 			error = err.message;
-			console.error('Search error:', err);
+			console.error("Search error:", err);
 		})
 		.finally(() => {
 			loading = false;
@@ -127,7 +127,7 @@ export function expandNode(nodeId: string) {
 	loading = true;
 	error = null;
 
-	callGraphApi('neighbors', { nodeId })
+	callGraphApi("neighbors", { nodeId })
 		.then((data) => {
 			if (data.error) {
 				error = data.error;
@@ -144,7 +144,7 @@ export function expandNode(nodeId: string) {
 		})
 		.catch((err) => {
 			error = err.message;
-			console.error('Expand error:', err);
+			console.error("Expand error:", err);
 		})
 		.finally(() => {
 			loading = false;
@@ -155,7 +155,7 @@ export function findPath(from: string, to: string) {
 	loading = true;
 	error = null;
 
-	callGraphApi('path', { from, to })
+	callGraphApi("path", { from, to })
 		.then((data) => {
 			if (data.error) {
 				error = data.error;
@@ -168,7 +168,7 @@ export function findPath(from: string, to: string) {
 		})
 		.catch((err) => {
 			error = err.message;
-			console.error('Path error:', err);
+			console.error("Path error:", err);
 		})
 		.finally(() => {
 			loading = false;
@@ -205,11 +205,11 @@ export function getError() {
 }
 
 export function getStats() {
-	const nodes = elements.filter((el) => !('source' in el.data));
-	const edges = elements.filter((el) => 'source' in el.data);
+	const nodes = elements.filter((el) => !("source" in el.data));
+	const edges = elements.filter((el) => "source" in el.data);
 	return {
 		nodeCount: nodes.length,
-		edgeCount: edges.length
+		edgeCount: edges.length,
 	};
 }
 
@@ -225,8 +225,8 @@ function loadAlgorithmEntities(results: AlgorithmResult[]) {
 			connections: r.connections,
 			...(r.pagerank != null ? { pagerank: r.pagerank } : {}),
 			...(r.communityId != null ? { communityId: r.communityId } : {}),
-			...(r.betweenness != null ? { betweenness: r.betweenness } : {})
-		}
+			...(r.betweenness != null ? { betweenness: r.betweenness } : {}),
+		},
 	}));
 	elements = nodes;
 	expandedNodes.clear();
@@ -234,24 +234,24 @@ function loadAlgorithmEntities(results: AlgorithmResult[]) {
 }
 
 export function loadAlgorithmStatus() {
-	callGraphApi('algorithm-status', {})
+	callGraphApi("algorithm-status", {})
 		.then((data) => {
 			algorithmStatus = {
 				lastComputed: data.lastComputed ?? null,
-				nodeCount: data.nodeCount ?? 0
+				nodeCount: data.nodeCount ?? 0,
 			};
 		})
 		.catch((err) => {
-			console.error('Algorithm status error:', err);
+			console.error("Algorithm status error:", err);
 		});
 }
 
 export function loadPageRank(limit = 25) {
 	loading = true;
 	error = null;
-	activeAlgorithm = 'pagerank';
+	activeAlgorithm = "pagerank";
 
-	callGraphApi('pagerank', { limit })
+	callGraphApi("pagerank", { limit })
 		.then((data) => {
 			if (data.error) {
 				error = data.error;
@@ -262,7 +262,7 @@ export function loadPageRank(limit = 25) {
 		})
 		.catch((err) => {
 			error = err.message;
-			console.error('PageRank error:', err);
+			console.error("PageRank error:", err);
 		})
 		.finally(() => {
 			loading = false;
@@ -272,9 +272,9 @@ export function loadPageRank(limit = 25) {
 export function loadCommunities(limit = 25) {
 	loading = true;
 	error = null;
-	activeAlgorithm = 'communities';
+	activeAlgorithm = "communities";
 
-	callGraphApi('communities', { limit })
+	callGraphApi("communities", { limit })
 		.then((data) => {
 			if (data.error) {
 				error = data.error;
@@ -286,7 +286,7 @@ export function loadCommunities(limit = 25) {
 		})
 		.catch((err) => {
 			error = err.message;
-			console.error('Communities error:', err);
+			console.error("Communities error:", err);
 		})
 		.finally(() => {
 			loading = false;
@@ -296,9 +296,9 @@ export function loadCommunities(limit = 25) {
 export function loadBridges(limit = 25) {
 	loading = true;
 	error = null;
-	activeAlgorithm = 'bridges';
+	activeAlgorithm = "bridges";
 
-	callGraphApi('bridges', { limit })
+	callGraphApi("bridges", { limit })
 		.then((data) => {
 			if (data.error) {
 				error = data.error;
@@ -309,7 +309,7 @@ export function loadBridges(limit = 25) {
 		})
 		.catch((err) => {
 			error = err.message;
-			console.error('Bridges error:', err);
+			console.error("Bridges error:", err);
 		})
 		.finally(() => {
 			loading = false;
@@ -319,9 +319,9 @@ export function loadBridges(limit = 25) {
 export function loadHiddenConnections() {
 	loading = true;
 	error = null;
-	activeAlgorithm = 'hidden-connections';
+	activeAlgorithm = "hidden-connections";
 
-	callGraphApi('hidden-connections', {})
+	callGraphApi("hidden-connections", {})
 		.then((data) => {
 			if (data.error) {
 				error = data.error;
@@ -331,7 +331,7 @@ export function loadHiddenConnections() {
 		})
 		.catch((err) => {
 			error = err.message;
-			console.error('Hidden connections error:', err);
+			console.error("Hidden connections error:", err);
 		})
 		.finally(() => {
 			loading = false;
@@ -343,15 +343,15 @@ export async function triggerComputation() {
 	error = null;
 
 	try {
-		const response = await fetch('/api/graph/compute', { method: 'POST' });
+		const response = await fetch("/api/graph/compute", { method: "POST" });
 		if (!response.ok) {
 			const data = await response.json();
-			throw new Error(data.error || 'Computation failed');
+			throw new Error(data.error || "Computation failed");
 		}
 		loadAlgorithmStatus();
 	} catch (err) {
-		error = err instanceof Error ? err.message : 'Computation failed';
-		console.error('Computation error:', err);
+		error = err instanceof Error ? err.message : "Computation failed";
+		console.error("Computation error:", err);
 	} finally {
 		computing = false;
 	}
@@ -363,14 +363,14 @@ export function loadHiddenConnectionPair(pair: HiddenConnectionPair) {
 
 	// Create nodes for both persons and shared neighbors
 	const personANode: CytoscapeElement = {
-		data: { id: pair.personAId, label: pair.personAName, type: 'Person' }
+		data: { id: pair.personAId, label: pair.personAName, type: "Person" },
 	};
 	const personBNode: CytoscapeElement = {
-		data: { id: pair.personBId, label: pair.personBName, type: 'Person' }
+		data: { id: pair.personBId, label: pair.personBName, type: "Person" },
 	};
 
 	const sharedNodes: CytoscapeElement[] = pair.topSharedNeighbors.map((n) => ({
-		data: { id: n.id, label: n.name, type: n.type }
+		data: { id: n.id, label: n.name, type: n.type },
 	}));
 
 	// Create edges from shared neighbors to each person
@@ -381,16 +381,16 @@ export function loadHiddenConnectionPair(pair: HiddenConnectionPair) {
 				id: `edge-${neighbor.id}-${pair.personAId}`,
 				source: neighbor.id,
 				target: pair.personAId,
-				label: 'shared'
-			}
+				label: "shared",
+			},
 		});
 		edges.push({
 			data: {
 				id: `edge-${neighbor.id}-${pair.personBId}`,
 				source: neighbor.id,
 				target: pair.personBId,
-				label: 'shared'
-			}
+				label: "shared",
+			},
 		});
 	}
 
@@ -400,9 +400,9 @@ export function loadHiddenConnectionPair(pair: HiddenConnectionPair) {
 			id: `hidden-${pair.personAId}-${pair.personBId}`,
 			source: pair.personAId,
 			target: pair.personBId,
-			label: 'hidden',
-			lineStyle: 'dashed'
-		}
+			label: "hidden",
+			lineStyle: "dashed",
+		},
 	});
 
 	elements = [personANode, personBNode, ...sharedNodes, ...edges];
@@ -411,7 +411,7 @@ export function loadHiddenConnectionPair(pair: HiddenConnectionPair) {
 	loading = false;
 }
 
-export function setColorMode(mode: 'type' | 'community') {
+export function setColorMode(mode: "type" | "community") {
 	colorMode = mode;
 }
 

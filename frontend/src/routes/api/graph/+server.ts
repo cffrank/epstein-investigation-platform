@@ -1,7 +1,7 @@
-import { json } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
-import { neo4jClient } from '$lib/server/neo4j';
-import { validateSearchQuery } from '@epstein/shared';
+import { neo4jClient } from "$lib/server/neo4j";
+import { validateSearchQuery } from "@epstein/shared";
+import { json } from "@sveltejs/kit";
+import type { RequestHandler } from "./$types";
 
 interface CytoscapeElement {
 	data: {
@@ -26,7 +26,7 @@ interface CytoscapeEdge {
 
 export const POST: RequestHandler = async ({ request, platform }) => {
 	if (!platform) {
-		return json({ error: 'Platform not available' }, { status: 500 });
+		return json({ error: "Platform not available" }, { status: 500 });
 	}
 
 	const body = await request.json();
@@ -36,10 +36,10 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 	try {
 		switch (action) {
-			case 'search': {
+			case "search": {
 				const { query: rawQuery } = params;
-				if (!rawQuery || typeof rawQuery !== 'string') {
-					return json({ error: 'Query required' }, { status: 400 });
+				if (!rawQuery || typeof rawQuery !== "string") {
+					return json({ error: "Query required" }, { status: 400 });
 				}
 				const query = validateSearchQuery(rawQuery);
 
@@ -55,7 +55,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 					ORDER BY connections DESC
 					LIMIT 20
 					`,
-					{ query }
+					{ query },
 				);
 
 				const nodes = result.rows.map((row) => ({
@@ -66,17 +66,17 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 						connections: row[3] as number,
 						...(row[4] != null && { pagerank: row[4] as number }),
 						...(row[5] != null && { communityId: row[5] as number }),
-						...(row[6] != null && { betweenness: row[6] as number })
-					}
+						...(row[6] != null && { betweenness: row[6] as number }),
+					},
 				}));
 
 				return json({ nodes, edges: [] });
 			}
 
-			case 'neighbors': {
+			case "neighbors": {
 				const { nodeId } = params;
 				if (!nodeId) {
-					return json({ error: 'nodeId required' }, { status: 400 });
+					return json({ error: "nodeId required" }, { status: 400 });
 				}
 
 				const result = await client.query(
@@ -89,13 +89,13 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 					       m.betweenness as betweenness
 					LIMIT 50
 					`,
-					{ nodeId }
+					{ nodeId },
 				);
 
 				const nodeMap = new Map<string, CytoscapeElement>();
 				const edges: CytoscapeEdge[] = [];
 
-				result.rows.forEach((row) => {
+				for (const row of result.rows) {
 					const sourceId = String(row[0]);
 					const targetId = String(row[1]);
 					const targetType = row[2] as string;
@@ -111,8 +111,8 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 								type: targetType,
 								...(row[6] != null && { pagerank: row[6] as number }),
 								...(row[7] != null && { communityId: row[7] as number }),
-								...(row[8] != null && { betweenness: row[8] as number })
-							}
+								...(row[8] != null && { betweenness: row[8] as number }),
+							},
 						});
 					}
 
@@ -122,18 +122,18 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 							id: `${sourceId}-${targetId}-${relType}`,
 							source: sourceId,
 							target: targetId,
-							label: relType
-						}
+							label: relType,
+						},
 					});
-				});
+				}
 
 				return json({
 					nodes: Array.from(nodeMap.values()),
-					edges
+					edges,
 				});
 			}
 
-			case 'pagerank': {
+			case "pagerank": {
 				const limit = params.limit ?? 25;
 				const result = await client.query(
 					`MATCH (n)
@@ -143,7 +143,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 					        n.betweenness as betweenness, COUNT { (n)--() } as connections
 					 ORDER BY n.pagerank DESC
 					 LIMIT $limit`,
-					{ limit }
+					{ limit },
 				);
 
 				const results = result.rows.map((row) => ({
@@ -153,13 +153,13 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 					pagerank: row[3] as number,
 					communityId: row[4] as number | null,
 					betweenness: row[5] as number | null,
-					connections: row[6] as number
+					connections: row[6] as number,
 				}));
 
 				return json({ results });
 			}
 
-			case 'communities': {
+			case "communities": {
 				const limit = params.limit ?? 25;
 				const result = await client.query(
 					`MATCH (n)
@@ -169,7 +169,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 					        n.betweenness as betweenness, COUNT { (n)--() } as connections
 					 ORDER BY n.pagerank DESC
 					 LIMIT $limit`,
-					{ limit }
+					{ limit },
 				);
 
 				const results = result.rows.map((row) => ({
@@ -179,7 +179,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 					communityId: row[3] as number,
 					pagerank: row[4] as number | null,
 					betweenness: row[5] as number | null,
-					connections: row[6] as number
+					connections: row[6] as number,
 				}));
 
 				const sizeResult = await client.query(
@@ -187,18 +187,18 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 					 WHERE n.communityId IS NOT NULL
 					 RETURN n.communityId as communityId, count(*) as size
 					 ORDER BY size DESC
-					 LIMIT 8`
+					 LIMIT 8`,
 				);
 
 				const communitySizes = sizeResult.rows.map((row) => ({
 					communityId: row[0] as number,
-					size: row[1] as number
+					size: row[1] as number,
 				}));
 
 				return json({ results, communitySizes });
 			}
 
-			case 'bridges': {
+			case "bridges": {
 				const limit = params.limit ?? 25;
 				const result = await client.query(
 					`MATCH (n)
@@ -208,7 +208,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 					        n.communityId as communityId, COUNT { (n)--() } as connections
 					 ORDER BY n.betweenness DESC
 					 LIMIT $limit`,
-					{ limit }
+					{ limit },
 				);
 
 				const results = result.rows.map((row) => ({
@@ -218,13 +218,13 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 					betweenness: row[3] as number,
 					pagerank: row[4] as number | null,
 					communityId: row[5] as number | null,
-					connections: row[6] as number
+					connections: row[6] as number,
 				}));
 
 				return json({ results });
 			}
 
-			case 'hidden-connections': {
+			case "hidden-connections": {
 				const result = await client.query(
 					`MATCH (a:Person)-[]->(shared)<-[]-(b:Person)
 					 WHERE NOT (a)-[]-(b) AND id(a) < id(b)
@@ -235,7 +235,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 					        cnt as sharedCount,
 					        [s IN sharedNodes[0..10] | {id: id(s), name: s.name, type: labels(s)[0]}] as topSharedNeighbors
 					 ORDER BY cnt DESC
-					 LIMIT 20`
+					 LIMIT 20`,
 				);
 
 				const pairs = result.rows.map((row) => ({
@@ -244,32 +244,32 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 					personBId: String(row[2]),
 					personBName: row[3] as string,
 					sharedCount: row[4] as number,
-					topSharedNeighbors: row[5] as Array<{ id: number; name: string; type: string }>
+					topSharedNeighbors: row[5] as Array<{ id: number; name: string; type: string }>,
 				}));
 
 				return json({ pairs });
 			}
 
-			case 'algorithm-status': {
+			case "algorithm-status": {
 				const metaResult = await client.query(
 					`OPTIONAL MATCH (m:Metadata {key: 'algorithm_last_computed'})
-					 RETURN m.value as lastComputed`
+					 RETURN m.value as lastComputed`,
 				);
 
 				const countResult = await client.query(
-					`MATCH (n) WHERE n.pagerank IS NOT NULL RETURN count(n) as count`
+					"MATCH (n) WHERE n.pagerank IS NOT NULL RETURN count(n) as count",
 				);
 
 				return json({
 					lastComputed: (metaResult.rows[0]?.[0] as string) ?? null,
-					nodeCount: (countResult.rows[0]?.[0] as number) ?? 0
+					nodeCount: (countResult.rows[0]?.[0] as number) ?? 0,
 				});
 			}
 
-			case 'path': {
+			case "path": {
 				const { from, to } = params;
 				if (!from || !to) {
-					return json({ error: 'from and to required' }, { status: 400 });
+					return json({ error: "from and to required" }, { status: 400 });
 				}
 
 				const result = await client.query(
@@ -284,11 +284,11 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 					       collect(distinct {source: id(startNode(r)), target: id(endNode(r)), type: type(r)}) as edges
 					LIMIT 1
 					`,
-					{ from, to }
+					{ from, to },
 				);
 
 				if (result.rows.length === 0) {
-					return json({ nodes: [], edges: [], error: 'No path found' });
+					return json({ nodes: [], edges: [], error: "No path found" });
 				}
 
 				const row = result.rows[0];
@@ -296,8 +296,8 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 					data: {
 						id: String(n.id),
 						label: n.name,
-						type: n.type
-					}
+						type: n.type,
+					},
 				}));
 
 				const edges = (row[1] as Array<{ source: number; target: number; type: string }>).map(
@@ -306,22 +306,22 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 							id: `${e.source}-${e.target}-${e.type}`,
 							source: String(e.source),
 							target: String(e.target),
-							label: e.type
-						}
-					})
+							label: e.type,
+						},
+					}),
 				);
 
 				return json({ nodes, edges });
 			}
 
 			default:
-				return json({ error: 'Invalid action' }, { status: 400 });
+				return json({ error: "Invalid action" }, { status: 400 });
 		}
 	} catch (error) {
-		console.error('Graph API error:', error);
+		console.error("Graph API error:", error);
 		return json(
-			{ error: error instanceof Error ? error.message : 'Unknown error' },
-			{ status: 500 }
+			{ error: error instanceof Error ? error.message : "Unknown error" },
+			{ status: 500 },
 		);
 	}
 };

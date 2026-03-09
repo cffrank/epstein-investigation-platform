@@ -1,30 +1,34 @@
 <script lang="ts">
-	import type { PageData } from './$types';
-	import type { EntityRef } from '$lib/types';
-	import { formatFileSize } from '$lib/utils';
-	import Badge from '$lib/components/ui/badge/badge.svelte';
-	import * as Resizable from '$lib/components/ui/resizable';
-	import TextView from '$lib/features/document-viewer/components/TextView.svelte';
-	import EntityList from '$lib/features/document-viewer/components/EntityList.svelte';
+import Badge from "$lib/components/ui/badge/badge.svelte";
+import * as Resizable from "$lib/components/ui/resizable";
+import EntityList from "$lib/features/document-viewer/components/EntityList.svelte";
+import TextView from "$lib/features/document-viewer/components/TextView.svelte";
+import type { EntityRef } from "$lib/types";
+import { formatFileSize } from "$lib/utils";
+import type { PageData } from "./$types";
 
-	let { data }: { data: PageData } = $props();
+const { data }: { data: PageData } = $props();
 
-	const document = data.document!;
-	const entities = data.entities as EntityRef[];
+const document =
+	data.document ??
+	(() => {
+		throw new Error("Document data missing");
+	})();
+const entities = data.entities as EntityRef[];
 
-	const entityColors: Record<string, string> = {
-		Person: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-		Organization: 'bg-green-500/20 text-green-400 border-green-500/30',
-		Location: 'bg-orange-500/20 text-orange-400 border-orange-500/30'
-	};
+const entityColors: Record<string, string> = {
+	Person: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+	Organization: "bg-green-500/20 text-green-400 border-green-500/30",
+	Location: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+};
 
-	function formatDate(dateString: string): string {
-		return new Date(dateString).toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
-	}
+function formatDate(dateString: string): string {
+	return new Date(dateString).toLocaleDateString("en-US", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	});
+}
 </script>
 
 <div class="flex h-screen flex-col">

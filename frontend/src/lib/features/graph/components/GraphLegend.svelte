@@ -1,22 +1,28 @@
 <script lang="ts">
-	const COMMUNITY_PALETTE = [
-		'#3b82f6', '#ef4444', '#22c55e', '#f59e0b',
-		'#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6'
-	];
+const COMMUNITY_PALETTE = [
+	"#3b82f6",
+	"#ef4444",
+	"#22c55e",
+	"#f59e0b",
+	"#8b5cf6",
+	"#06b6d4",
+	"#ec4899",
+	"#14b8a6",
+];
 
-	const TYPE_ITEMS = [
-		{ label: 'Person', color: '#3b82f6', shape: 'circle' },
-		{ label: 'Organization', color: '#22c55e', shape: 'diamond' },
-		{ label: 'Location', color: '#f97316', shape: 'triangle' }
-	] as const;
+const TYPE_ITEMS = [
+	{ label: "Person", color: "#3b82f6", shape: "circle" },
+	{ label: "Organization", color: "#22c55e", shape: "diamond" },
+	{ label: "Location", color: "#f97316", shape: "triangle" },
+] as const;
 
-	let {
-		colorMode = 'type',
-		communitySizes = []
-	}: {
-		colorMode: 'type' | 'community';
-		communitySizes: Array<{ communityId: number; size: number }>;
-	} = $props();
+const {
+	colorMode = "type",
+	communitySizes = [],
+}: {
+	colorMode: "type" | "community";
+	communitySizes: Array<{ communityId: number; size: number }>;
+} = $props();
 </script>
 
 <div class="absolute bottom-4 right-4 z-10 rounded-lg bg-card/90 backdrop-blur-sm p-3 shadow-lg border text-xs min-w-[140px]">

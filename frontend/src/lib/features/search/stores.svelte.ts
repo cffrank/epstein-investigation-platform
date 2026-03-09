@@ -1,8 +1,14 @@
-import type { SearchResult, SearchMode, SearchResponse, SearchFilters, EntityRef } from '$lib/types';
+import type {
+	EntityRef,
+	SearchFilters,
+	SearchMode,
+	SearchResponse,
+	SearchResult,
+} from "$lib/types";
 
 class SearchStore {
-	query = $state('');
-	mode = $state<SearchMode>('hybrid');
+	query = $state("");
+	mode = $state<SearchMode>("hybrid");
 	results = $state<SearchResult[]>([]);
 	total = $state(0);
 	loading = $state(false);
@@ -23,18 +29,18 @@ class SearchStore {
 		this.error = null;
 
 		try {
-			const response = await fetch('/api/search', {
-				method: 'POST',
+			const response = await fetch("/api/search", {
+				method: "POST",
 				headers: {
-					'Content-Type': 'application/json'
+					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
 					query: this.query,
 					filters: this.filters,
 					mode: this.mode,
 					page: this.page,
-					limit: this.limit
-				})
+					limit: this.limit,
+				}),
 			});
 
 			if (!response.ok) {
@@ -45,7 +51,7 @@ class SearchStore {
 			this.results = data.results;
 			this.total = data.total;
 		} catch (err) {
-			this.error = err instanceof Error ? err.message : 'Search failed';
+			this.error = err instanceof Error ? err.message : "Search failed";
 			this.results = [];
 			this.total = 0;
 		} finally {
@@ -71,9 +77,8 @@ class SearchStore {
 		// Preserve entityIds from selectedEntities when filters come from sidebar
 		this.filters = {
 			...f,
-			entityIds: this.selectedEntities.length > 0
-				? this.selectedEntities.map((e) => e.id)
-				: undefined
+			entityIds:
+				this.selectedEntities.length > 0 ? this.selectedEntities.map((e) => e.id) : undefined,
 		};
 		this.page = 1;
 	}
@@ -83,7 +88,7 @@ class SearchStore {
 		this.selectedEntities = [...this.selectedEntities, entity];
 		this.filters = {
 			...this.filters,
-			entityIds: this.selectedEntities.map((e) => e.id)
+			entityIds: this.selectedEntities.map((e) => e.id),
 		};
 		this.page = 1;
 	}
@@ -92,9 +97,8 @@ class SearchStore {
 		this.selectedEntities = this.selectedEntities.filter((e) => e.id !== entityId);
 		this.filters = {
 			...this.filters,
-			entityIds: this.selectedEntities.length > 0
-				? this.selectedEntities.map((e) => e.id)
-				: undefined
+			entityIds:
+				this.selectedEntities.length > 0 ? this.selectedEntities.map((e) => e.id) : undefined,
 		};
 		this.page = 1;
 	}
@@ -103,7 +107,7 @@ class SearchStore {
 		this.selectedEntities = [];
 		this.filters = {
 			...this.filters,
-			entityIds: undefined
+			entityIds: undefined,
 		};
 		this.page = 1;
 	}

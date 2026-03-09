@@ -1,16 +1,16 @@
 <script lang="ts">
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { Button } from '$lib/components/ui/button';
+import { Button } from "$lib/components/ui/button";
+import { Textarea } from "$lib/components/ui/textarea";
 
-	interface Props {
-		initialContent?: string;
-		onSave: (content: string) => Promise<void>;
-		onCancel: () => void;
-		saving?: boolean;
-	}
+interface Props {
+	initialContent?: string;
+	onSave: (content: string) => Promise<void>;
+	onCancel: () => void;
+	saving?: boolean;
+}
 
-	let { initialContent = '', onSave, onCancel, saving = false }: Props = $props();
-	let content = $state(initialContent);
+const { initialContent = "", onSave, onCancel, saving = false }: Props = $props();
+const content = $state(initialContent);
 </script>
 
 <div class="space-y-2">

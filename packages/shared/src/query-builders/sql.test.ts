@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-	buildFulltextSearchQuery,
 	buildCappedCountQuery,
 	buildDocumentStatsQuery,
 	buildEntityListQuery,
+	buildFulltextSearchQuery,
 } from "./sql.js";
 
 describe("buildFulltextSearchQuery", () => {
@@ -45,10 +45,9 @@ describe("buildFulltextSearchQuery", () => {
 
 describe("buildCappedCountQuery", () => {
 	it("returns SQL with LIMIT 10001 CTE", () => {
-		const result = buildCappedCountQuery(
-			"search_vector @@ plainto_tsquery('english', $1)",
-			["test"],
-		);
+		const result = buildCappedCountQuery("search_vector @@ plainto_tsquery('english', $1)", [
+			"test",
+		]);
 		expect(result.text).toContain("10001");
 		expect(result.text).toContain("COUNT");
 	});

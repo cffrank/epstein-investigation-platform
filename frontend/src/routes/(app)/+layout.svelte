@@ -1,19 +1,19 @@
 <script lang="ts">
-	import { afterNavigate } from '$app/navigation';
-	import Sidebar from '$lib/components/layout/Sidebar.svelte';
-	import CommandSearch from '$lib/components/layout/CommandSearch.svelte';
-	import * as Sheet from '$lib/components/ui/sheet';
-	import { Button } from '$lib/components/ui/button';
-	import { Menu, FileText } from '@lucide/svelte';
+import { afterNavigate } from "$app/navigation";
+import CommandSearch from "$lib/components/layout/CommandSearch.svelte";
+import Sidebar from "$lib/components/layout/Sidebar.svelte";
+import { Button } from "$lib/components/ui/button";
+import * as Sheet from "$lib/components/ui/sheet";
+import { FileText, Menu } from "@lucide/svelte";
 
-	let { children } = $props();
-	let sidebarCollapsed = $state(false);
-	let mobileOpen = $state(false);
+const { children } = $props();
+const sidebarCollapsed = $state(false);
+let mobileOpen = $state(false);
 
-	// Close mobile nav on navigation
-	afterNavigate(() => {
-		mobileOpen = false;
-	});
+// Close mobile nav on navigation
+afterNavigate(() => {
+	mobileOpen = false;
+});
 </script>
 
 <!-- Mobile header -->

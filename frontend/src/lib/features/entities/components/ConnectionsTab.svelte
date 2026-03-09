@@ -1,28 +1,28 @@
 <script lang="ts">
-	import * as Card from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as Accordion from '$lib/components/ui/accordion';
-	import { entityColor } from '$lib/utils';
-	import type { EntityConnection, EntityCoOccurrence } from '$lib/types';
+import * as Accordion from "$lib/components/ui/accordion";
+import { Badge } from "$lib/components/ui/badge";
+import * as Card from "$lib/components/ui/card";
+import type { EntityCoOccurrence, EntityConnection } from "$lib/types";
+import { entityColor } from "$lib/utils";
 
-	interface Props {
-		connections: EntityConnection[];
-		coOccurrences: EntityCoOccurrence[];
+interface Props {
+	connections: EntityConnection[];
+	coOccurrences: EntityCoOccurrence[];
+}
+
+const { connections, coOccurrences }: Props = $props();
+
+const connectionsByType = $derived.by(() => {
+	const map = new Map<string, EntityConnection[]>();
+	for (const conn of connections) {
+		const key = conn.relationship_type;
+		if (!map.has(key)) {
+			map.set(key, []);
+		}
+		map.get(key)?.push(conn);
 	}
-
-	let { connections, coOccurrences }: Props = $props();
-
-	const connectionsByType = $derived.by(() => {
-		const map = new Map<string, EntityConnection[]>();
-		connections.forEach((conn) => {
-			const key = conn.relationship_type;
-			if (!map.has(key)) {
-				map.set(key, []);
-			}
-			map.get(key)!.push(conn);
-		});
-		return Array.from(map.entries()).sort((a, b) => b[1].length - a[1].length);
-	});
+	return Array.from(map.entries()).sort((a, b) => b[1].length - a[1].length);
+});
 </script>
 
 <div class="space-y-8">

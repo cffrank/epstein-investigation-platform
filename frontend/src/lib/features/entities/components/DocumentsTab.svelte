@@ -1,57 +1,61 @@
 <script lang="ts">
-	import * as Card from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Input } from '$lib/components/ui/input';
-	import { Button } from '$lib/components/ui/button';
-	import { truncate, formatFileSize } from '$lib/utils';
+import { Badge } from "$lib/components/ui/badge";
+import { Button } from "$lib/components/ui/button";
+import * as Card from "$lib/components/ui/card";
+import { Input } from "$lib/components/ui/input";
+import { formatFileSize, truncate } from "$lib/utils";
 
-	interface DocItem {
-		id: string;
-		filename: string;
-		source: string;
-		doc_type: string | null;
-		file_size_bytes: number | null;
-		created_at: string;
+interface DocItem {
+	id: string;
+	filename: string;
+	source: string;
+	doc_type: string | null;
+	file_size_bytes: number | null;
+	created_at: string;
+}
+
+interface Props {
+	documents: DocItem[];
+}
+
+const { documents }: Props = $props();
+
+let searchQuery = $state("");
+let selectedDocType = $state("all");
+
+const docTypes = $derived(() => {
+	const types = new Set(
+		documents
+			.filter((d): d is typeof d & { doc_type: string } => !!d.doc_type)
+			.map((d) => d.doc_type),
+	);
+	return ["all", ...Array.from(types).sort()];
+});
+
+const filteredDocs = $derived(() => {
+	let result = documents;
+	if (searchQuery.trim()) {
+		const q = searchQuery.toLowerCase();
+		result = result.filter((d) => d.filename.toLowerCase().includes(q));
 	}
-
-	interface Props {
-		documents: DocItem[];
+	if (selectedDocType !== "all") {
+		result = result.filter((d) => d.doc_type === selectedDocType);
 	}
+	return result;
+});
 
-	let { documents }: Props = $props();
-
-	let searchQuery = $state('');
-	let selectedDocType = $state('all');
-
-	const docTypes = $derived(() => {
-		const types = new Set(documents.filter((d) => d.doc_type).map((d) => d.doc_type!));
-		return ['all', ...Array.from(types).sort()];
-	});
-
-	const filteredDocs = $derived(() => {
-		let result = documents;
-		if (searchQuery.trim()) {
-			const q = searchQuery.toLowerCase();
-			result = result.filter((d) => d.filename.toLowerCase().includes(q));
-		}
-		if (selectedDocType !== 'all') {
-			result = result.filter((d) => d.doc_type === selectedDocType);
-		}
-		return result;
-	});
-
-	function formatDate(dateStr: string): string {
-		try {
-			return new Date(dateStr).toLocaleDateString();
-		} catch {
-			return dateStr;
-		}
+function formatDate(dateStr: string): string {
+	try {
+		return new Date(dateStr).toLocaleDateString();
+	} catch {
+		return dateStr;
 	}
+}
 
-	function clearFilters() {
-		searchQuery = '';
-		selectedDocType = 'all';
-	}
+function clearFilters() {
+	searchQuery = "";
+	selectedDocType = "all";
+}
 </script>
 
 <div class="space-y-4">

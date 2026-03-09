@@ -1,8 +1,8 @@
-import type { RequestHandler } from '@sveltejs/kit';
-import { createAnthropicClient, CLAUDE_MODELS, DEFAULT_MODEL } from '$lib/server/anthropic';
-import type { ModelKey } from '$lib/types';
-import { toolDefinitions, executeTool } from '$lib/server/tools';
-import type Anthropic from '@anthropic-ai/sdk';
+import { CLAUDE_MODELS, DEFAULT_MODEL, createAnthropicClient } from "$lib/server/anthropic";
+import { executeTool, toolDefinitions } from "$lib/server/tools";
+import type { ModelKey } from "$lib/types";
+import type Anthropic from "@anthropic-ai/sdk";
+import type { RequestHandler } from "@sveltejs/kit";
 
 interface ChatRequest {
 	messages: Array<{ role: string; content: string }>;
@@ -29,9 +29,9 @@ const MAX_TOOL_ITERATIONS = 5;
 
 export const POST: RequestHandler = async ({ request, platform }) => {
 	if (!platform?.env) {
-		return new Response(JSON.stringify({ error: 'Platform not available' }), {
+		return new Response(JSON.stringify({ error: "Platform not available" }), {
 			status: 500,
-			headers: { 'Content-Type': 'application/json' },
+			headers: { "Content-Type": "application/json" },
 		});
 	}
 
@@ -40,9 +40,9 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		const { messages } = body;
 
 		if (!messages || messages.length === 0) {
-			return new Response(JSON.stringify({ error: 'No messages provided' }), {
+			return new Response(JSON.stringify({ error: "No messages provided" }), {
 				status: 400,
-				headers: { 'Content-Type': 'application/json' },
+				headers: { "Content-Type": "application/json" },
 			});
 		}
 
@@ -61,18 +61,18 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 		// Convert to Anthropic message format
 		const anthropicMessages: Anthropic.Messages.MessageParam[] = contextMessages
-			.filter((m) => m.role === 'user' || m.role === 'assistant')
+			.filter((m) => m.role === "user" || m.role === "assistant")
 			.map((m) => ({
-				role: m.role as 'user' | 'assistant',
+				role: m.role as "user" | "assistant",
 				content: m.content,
 			}));
 
 		// Ensure messages alternate user/assistant (Anthropic requirement)
 		// and start with a user message
-		if (anthropicMessages.length === 0 || anthropicMessages[0].role !== 'user') {
-			return new Response(JSON.stringify({ error: 'Messages must start with a user message' }), {
+		if (anthropicMessages.length === 0 || anthropicMessages[0].role !== "user") {
+			return new Response(JSON.stringify({ error: "Messages must start with a user message" }), {
 				status: 400,
-				headers: { 'Content-Type': 'application/json' },
+				headers: { "Content-Type": "application/json" },
 			});
 		}
 
@@ -110,31 +110,31 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 					for await (const event of stream) {
 						switch (event.type) {
-							case 'content_block_start': {
-								if (event.content_block.type === 'tool_use') {
+							case "content_block_start": {
+								if (event.content_block.type === "tool_use") {
 									toolUseAccumulator.set(event.index, {
 										id: event.content_block.id,
 										name: event.content_block.name,
-										inputJson: '',
+										inputJson: "",
 									});
-									await writeSSE('tool_call', {
+									await writeSSE("tool_call", {
 										id: event.content_block.id,
 										name: event.content_block.name,
 									});
 								}
 								break;
 							}
-							case 'content_block_delta': {
-								if (event.delta.type === 'text_delta') {
-									await writeSSE('text_delta', { text: event.delta.text });
-								} else if (event.delta.type === 'input_json_delta') {
+							case "content_block_delta": {
+								if (event.delta.type === "text_delta") {
+									await writeSSE("text_delta", { text: event.delta.text });
+								} else if (event.delta.type === "input_json_delta") {
 									// Accumulate tool input JSON
 									const acc = toolUseAccumulator.get(event.index);
 									if (acc) {
 										acc.inputJson += event.delta.partial_json;
 									}
-								} else if (event.delta.type === 'citations_delta') {
-									await writeSSE('citations_delta', {
+								} else if (event.delta.type === "citations_delta") {
+									await writeSSE("citations_delta", {
 										citation: (event.delta as unknown as { citation: unknown }).citation,
 									});
 								}
@@ -145,14 +145,14 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 					const finalMessage = await stream.finalMessage();
 
-					if (finalMessage.stop_reason !== 'tool_use') {
+					if (finalMessage.stop_reason !== "tool_use") {
 						// No more tools to execute — we're done
 						break;
 					}
 
 					// Extract tool_use blocks from the final message
 					const toolUseBlocks = finalMessage.content.filter(
-						(block): block is Anthropic.Messages.ToolUseBlock => block.type === 'tool_use'
+						(block): block is Anthropic.Messages.ToolUseBlock => block.type === "tool_use",
 					);
 
 					if (toolUseBlocks.length === 0) break;
@@ -162,43 +162,44 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 						toolUseBlocks.map(async (block) => {
 							const result = await executeTool(block.name, block.input, platform);
 							return { block, result };
-						})
+						}),
 					);
 
 					// Notify client of tool results
 					for (const { block, result } of toolResults) {
 						const resultCount = Array.isArray(result)
-							? result.filter((r) => 'type' in r && r.type === 'search_result').length
+							? result.filter((r) => "type" in r && r.type === "search_result").length
 							: 0;
-						await writeSSE('tool_result', {
+						await writeSSE("tool_result", {
 							id: block.id,
 							name: block.name,
-							status: 'complete',
+							status: "complete",
 							resultCount,
 						});
 					}
 
 					// Build messages for next iteration
-					const toolResultMessages: Anthropic.Messages.ToolResultBlockParam[] =
-						toolResults.map(({ block, result }) => ({
-							type: 'tool_result' as const,
+					const toolResultMessages: Anthropic.Messages.ToolResultBlockParam[] = toolResults.map(
+						({ block, result }) => ({
+							type: "tool_result" as const,
 							tool_use_id: block.id,
 							content: result,
-						}));
+						}),
+					);
 
 					currentMessages = [
 						...currentMessages,
-						{ role: 'assistant' as const, content: finalMessage.content },
-						{ role: 'user' as const, content: toolResultMessages },
+						{ role: "assistant" as const, content: finalMessage.content },
+						{ role: "user" as const, content: toolResultMessages },
 					];
 				}
 
-				await writeSSE('done', { model: modelId });
+				await writeSSE("done", { model: modelId });
 			} catch (error) {
-				console.error('Stream error:', error);
-				const message = error instanceof Error ? error.message : 'Unknown error';
+				console.error("Stream error:", error);
+				const message = error instanceof Error ? error.message : "Unknown error";
 				try {
-					await writeSSE('error', { message });
+					await writeSSE("error", { message });
 				} catch {
 					// Writer may be closed
 				}
@@ -213,19 +214,19 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 		return new Response(readable, {
 			headers: {
-				'Content-Type': 'text/event-stream',
-				'Cache-Control': 'no-cache, no-transform',
-				'X-Accel-Buffering': 'no',
-				Connection: 'keep-alive',
+				"Content-Type": "text/event-stream",
+				"Cache-Control": "no-cache, no-transform",
+				"X-Accel-Buffering": "no",
+				Connection: "keep-alive",
 			},
 		});
 	} catch (error) {
-		console.error('Chat API error:', error);
+		console.error("Chat API error:", error);
 		return new Response(
 			JSON.stringify({
-				error: error instanceof Error ? error.message : 'Unknown error',
+				error: error instanceof Error ? error.message : "Unknown error",
 			}),
-			{ status: 500, headers: { 'Content-Type': 'application/json' } }
+			{ status: 500, headers: { "Content-Type": "application/json" } },
 		);
 	}
 };

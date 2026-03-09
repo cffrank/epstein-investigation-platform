@@ -1,8 +1,8 @@
 <script lang="ts">
-	import '../app.css';
-	import { Toaster } from '$lib/components/ui/sonner';
+import "../app.css";
+import { Toaster } from "$lib/components/ui/sonner";
 
-	let { children } = $props();
+const { children } = $props();
 </script>
 
 {@render children()}

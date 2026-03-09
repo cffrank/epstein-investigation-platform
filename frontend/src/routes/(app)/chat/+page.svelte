@@ -1,49 +1,49 @@
 <script lang="ts">
-	import { chatStore } from '$lib/features/chat/stores.svelte';
-	import ChatMessage from '$lib/features/chat/components/ChatMessage.svelte';
-	import ChatInput from '$lib/features/chat/components/ChatInput.svelte';
-	import CitationPanel from '$lib/features/chat/components/CitationPanel.svelte';
-	import ModelSelector from '$lib/features/chat/components/ModelSelector.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Plus, Loader2 } from '@lucide/svelte';
-	import { page } from '$app/stores';
+import { page } from "$app/stores";
+import { Button } from "$lib/components/ui/button";
+import ChatInput from "$lib/features/chat/components/ChatInput.svelte";
+import ChatMessage from "$lib/features/chat/components/ChatMessage.svelte";
+import CitationPanel from "$lib/features/chat/components/CitationPanel.svelte";
+import ModelSelector from "$lib/features/chat/components/ModelSelector.svelte";
+import { chatStore } from "$lib/features/chat/stores.svelte";
+import { Loader2, Plus } from "@lucide/svelte";
 
-	let messagesContainer: HTMLDivElement;
+let messagesContainer: HTMLDivElement;
 
-	// Pre-fill chat input from entity dossier page (?entity=NAME)
-	$effect(() => {
-		const entityParam = $page.url.searchParams.get('entity');
-		if (entityParam && !chatStore.messages.length) {
-			chatStore.input = `Tell me about ${entityParam}`;
-		}
-	});
-
-	function scrollToBottom() {
-		if (messagesContainer) {
-			messagesContainer.scrollTop = messagesContainer.scrollHeight;
-		}
+// Pre-fill chat input from entity dossier page (?entity=NAME)
+$effect(() => {
+	const entityParam = $page.url.searchParams.get("entity");
+	if (entityParam && !chatStore.messages.length) {
+		chatStore.input = `Tell me about ${entityParam}`;
 	}
+});
 
-	$effect(() => {
-		// Scroll to bottom when messages change
-		chatStore.messages;
-		setTimeout(scrollToBottom, 100);
-	});
-
-	async function handleSend(content: string) {
-		await chatStore.sendMessage(content);
+function scrollToBottom() {
+	if (messagesContainer) {
+		messagesContainer.scrollTop = messagesContainer.scrollHeight;
 	}
+}
 
-	function handleClear() {
-		chatStore.clearChat();
-	}
+$effect(() => {
+	// Scroll to bottom when messages change
+	chatStore.messages;
+	setTimeout(scrollToBottom, 100);
+});
 
-	// Get citations from last assistant message
-	const lastAssistantCitations = $derived(() => {
-		const assistantMessages = chatStore.messages.filter((m) => m.role === 'assistant');
-		const last = assistantMessages[assistantMessages.length - 1];
-		return last?.citations ?? [];
-	});
+async function handleSend(content: string) {
+	await chatStore.sendMessage(content);
+}
+
+function handleClear() {
+	chatStore.clearChat();
+}
+
+// Get citations from last assistant message
+const lastAssistantCitations = $derived(() => {
+	const assistantMessages = chatStore.messages.filter((m) => m.role === "assistant");
+	const last = assistantMessages[assistantMessages.length - 1];
+	return last?.citations ?? [];
+});
 </script>
 
 <div class="flex h-[calc(100vh-4rem)] flex-col">

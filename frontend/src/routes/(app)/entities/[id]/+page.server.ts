@@ -1,31 +1,31 @@
-import { error } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
-import { neo4jClient } from '$lib/server/neo4j';
-import { query as dbQuery } from '$lib/server/db';
+import { query as dbQuery } from "$lib/server/db";
+import { neo4jClient } from "$lib/server/neo4j";
 import type {
-	EntityConnection,
-	EntityCoOccurrence,
+	Document,
 	EntityBiography,
+	EntityCoOccurrence,
+	EntityConnection,
+	EntityType,
 	InvestigationNote,
 	TimelineEvent,
-	Document,
-	EntityType
-} from '$lib/types';
+} from "$lib/types";
+import { error } from "@sveltejs/kit";
+import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ params, platform }) => {
 	if (!platform?.env) {
-		throw error(500, 'Platform unavailable in dev mode');
+		throw error(500, "Platform unavailable in dev mode");
 	}
 
 	const { id } = params;
 
 	if (!id || !/^\d+$/.test(id)) {
-		throw error(400, 'Invalid entity ID');
+		throw error(400, "Invalid entity ID");
 	}
 
 	try {
 		const neo4j = neo4jClient(platform);
-		const entityId = parseInt(id, 10);
+		const entityId = Number.parseInt(id, 10);
 
 		// Fetch entity profile with connections and aliases
 		const profileCypher = `
@@ -47,24 +47,26 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		const profileResult = await neo4j.query(profileCypher, { id: entityId });
 
 		if (!profileResult.rows.length) {
-			throw error(404, 'Entity not found');
+			throw error(404, "Entity not found");
 		}
 
 		const [name, type, aliasesRaw, connectionsRaw] = profileResult.rows[0];
 
 		// Filter out null connections and map to proper type
-		const connections: EntityConnection[] = (connectionsRaw as Array<{
-			id: number;
-			name: string;
-			type: string;
-			rel: string;
-		}>)
+		const connections: EntityConnection[] = (
+			connectionsRaw as Array<{
+				id: number;
+				name: string;
+				type: string;
+				rel: string;
+			}>
+		)
 			.filter((c) => c.id !== null && c.name !== null)
 			.map((c) => ({
 				id: String(c.id),
 				name: c.name,
 				type: c.type as EntityType,
-				relationship_type: c.rel
+				relationship_type: c.rel,
 			}));
 
 		// Fetch documents mentioning this entity
@@ -77,9 +79,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		`;
 
 		const docsResult = await neo4j.query(docsCypher, { id: entityId });
-		const docIds = docsResult.rows
-			.map((row) => row[0] as string)
-			.filter((docId) => docId !== null);
+		const docIds = docsResult.rows.map((row) => row[0] as string).filter((docId) => docId !== null);
 
 		// Fetch document metadata from PostgreSQL
 		let documents: Document[] = [];
@@ -110,7 +110,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 				text: null,
 				page_count: null,
 				content_hash: null,
-				created_at: doc.created_at
+				created_at: doc.created_at,
 			}));
 		}
 
@@ -134,7 +134,7 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 			id: String(row[0]),
 			name: row[1] as string,
 			type: row[2] as EntityType,
-			shared_docs: row[3] as number
+			shared_docs: row[3] as number,
 		}));
 
 		// Fetch timeline events from Neo4j (Event nodes connected to entity)
@@ -151,11 +151,11 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 			const timelineResult = await neo4j.query(timelineCypher, { id: entityId });
 			timeline_events = timelineResult.rows.map((row) => ({
 				id: String(row[0]),
-				date: (row[1] as string) || '',
-				description: (row[2] as string) || '',
+				date: (row[1] as string) || "",
+				description: (row[2] as string) || "",
 				document_id: row[3] as string | null,
 				document_name: row[4] as string | null,
-				event_type: (row[5] as string) || 'event'
+				event_type: (row[5] as string) || "event",
 			}));
 		} catch {
 			// Event nodes may not exist yet (Phase 6 creates them)
@@ -167,8 +167,8 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 		try {
 			notes = await dbQuery<InvestigationNote>(
 				platform,
-				'SELECT id, entity_id, content, created_at, updated_at FROM entity_notes WHERE entity_id = $1 ORDER BY created_at DESC',
-				[id]
+				"SELECT id, entity_id, content, created_at, updated_at FROM entity_notes WHERE entity_id = $1 ORDER BY created_at DESC",
+				[id],
 			);
 		} catch {
 			// Table may not exist yet
@@ -189,13 +189,13 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 				 FROM entities
 				 WHERE canonical_name ILIKE $1
 				 LIMIT 1`,
-				[name as string]
+				[name as string],
 			);
 			if (bioResult.length > 0 && bioResult[0].biography_generated_at) {
 				biography = {
-					content: bioResult[0].biography || bioResult[0].description || '',
+					content: bioResult[0].biography || bioResult[0].description || "",
 					generated_at: bioResult[0].biography_generated_at,
-					model: bioResult[0].biography_model || 'unknown',
+					model: bioResult[0].biography_model || "unknown",
 				};
 			}
 		} catch {
@@ -220,10 +220,10 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 			timeline_events,
 		};
 	} catch (err) {
-		console.error('Entity profile load error:', err);
+		console.error("Entity profile load error:", err);
 		if ((err as { status?: number }).status) {
 			throw err;
 		}
-		throw error(500, 'Failed to load entity profile');
+		throw error(500, "Failed to load entity profile");
 	}
 };

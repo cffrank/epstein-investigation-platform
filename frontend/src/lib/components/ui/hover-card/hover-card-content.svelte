@@ -1,19 +1,19 @@
 <script lang="ts">
-	import { LinkPreview as HoverCardPrimitive } from "bits-ui";
-	import { cn, type WithoutChildrenOrChild } from "$lib/utils";
-	import HoverCardPortal from "./hover-card-portal.svelte";
-	import type { ComponentProps } from "svelte";
+import { type WithoutChildrenOrChild, cn } from "$lib/utils";
+import type { LinkPreview as HoverCardPrimitive } from "bits-ui";
+import type { ComponentProps } from "svelte";
+import type HoverCardPortal from "./hover-card-portal.svelte";
 
-	let {
-		ref = $bindable(null),
-		class: className,
-		align = "center",
-		sideOffset = 4,
-		portalProps,
-		...restProps
-	}: HoverCardPrimitive.ContentProps & {
-		portalProps?: WithoutChildrenOrChild<ComponentProps<typeof HoverCardPortal>>;
-	} = $props();
+const {
+	ref = $bindable(null),
+	class: className,
+	align = "center",
+	sideOffset = 4,
+	portalProps,
+	...restProps
+}: HoverCardPrimitive.ContentProps & {
+	portalProps?: WithoutChildrenOrChild<ComponentProps<typeof HoverCardPortal>>;
+} = $props();
 </script>
 
 <HoverCardPortal {...portalProps}>

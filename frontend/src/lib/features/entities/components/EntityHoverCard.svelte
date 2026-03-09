@@ -1,16 +1,20 @@
 <script lang="ts">
-	import * as HoverCard from '$lib/components/ui/hover-card';
-	import { Badge } from '$lib/components/ui/badge';
-	import { entityColor } from '$lib/utils';
-	import type { EntityType } from '$lib/types';
+import { Badge } from "$lib/components/ui/badge";
+import * as HoverCard from "$lib/components/ui/hover-card";
+import type { EntityType } from "$lib/types";
+import { entityColor } from "$lib/utils";
 
-	let { entityId, entityName, entityType }: {
-		entityId: string;
-		entityName: string;
-		entityType: EntityType;
-	} = $props();
+const {
+	entityId,
+	entityName,
+	entityType,
+}: {
+	entityId: string;
+	entityName: string;
+	entityType: EntityType;
+} = $props();
 
-	const color = $derived(entityColor(entityType));
+const color = $derived(entityColor(entityType));
 </script>
 
 <HoverCard.Root>

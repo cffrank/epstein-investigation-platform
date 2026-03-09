@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-	SEARCH_SNIPPET_SANITIZE_CONFIG,
 	CHAT_CONTENT_SANITIZE_CONFIG,
 	DOCUMENT_TEXT_SANITIZE_CONFIG,
-	validateSearchQuery,
+	SEARCH_SNIPPET_SANITIZE_CONFIG,
 	validatePaginationParams,
+	validateSearchQuery,
 } from "./sanitize.js";
 
 describe("SEARCH_SNIPPET_SANITIZE_CONFIG", () => {

@@ -1,12 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-	validateRelationshipTypes,
-	validateNodeLabels,
-	buildTraversalQuery,
+	ALLOWED_NODE_LABELS,
+	ALLOWED_RELATIONSHIP_TYPES,
 	buildNeighborsQuery,
 	buildShortestPathQuery,
-	ALLOWED_RELATIONSHIP_TYPES,
-	ALLOWED_NODE_LABELS,
+	buildTraversalQuery,
+	validateNodeLabels,
+	validateRelationshipTypes,
 } from "./cypher.js";
 
 describe("validateRelationshipTypes", () => {

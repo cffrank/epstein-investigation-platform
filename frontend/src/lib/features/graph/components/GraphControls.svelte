@@ -1,13 +1,19 @@
 <script lang="ts">
-	import { ZoomIn, ZoomOut, Maximize2, RotateCcw } from '@lucide/svelte';
+import { Maximize2, RotateCcw, ZoomIn, ZoomOut } from "@lucide/svelte";
 
-	let { stats, onFit, onZoomIn, onZoomOut, onReset }: {
-		stats: { nodeCount: number; edgeCount: number };
-		onFit: () => void;
-		onZoomIn: () => void;
-		onZoomOut: () => void;
-		onReset: () => void;
-	} = $props();
+const {
+	stats,
+	onFit,
+	onZoomIn,
+	onZoomOut,
+	onReset,
+}: {
+	stats: { nodeCount: number; edgeCount: number };
+	onFit: () => void;
+	onZoomIn: () => void;
+	onZoomOut: () => void;
+	onReset: () => void;
+} = $props();
 </script>
 
 <div class="absolute right-4 top-4 z-10 flex flex-col gap-2 rounded-lg bg-card p-2 shadow-lg border">

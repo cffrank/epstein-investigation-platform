@@ -1,437 +1,456 @@
-import { Hono } from 'hono';
-import { cors } from 'hono/cors';
-import { cache } from 'hono/cache';
+import { Hono } from "hono";
+import { cache } from "hono/cache";
+import { cors } from "hono/cors";
 
 // Cloudflare bindings type
 type Bindings = {
-  DOCUMENTS: R2Bucket;
-  CACHE_DB: D1Database;
-  SESSIONS: KVNamespace;
-  AI: Ai;
-  DOCUMENT_QUEUE: Queue<DocumentMessage>;
-  DLQ: Queue<DocumentMessage>;
-  DOCUMENT_WORKFLOW: Workflow;
-  BATCH_WORKFLOW: Workflow;
-  API_SECRET_KEY: string;
-  AI_GATEWAY_TOKEN: string;
-  OPENAI_API_KEY: string;
-  ORIGIN_URL: string;
-  ENVIRONMENT: string;
+	DOCUMENTS: R2Bucket;
+	CACHE_DB: D1Database;
+	SESSIONS: KVNamespace;
+	AI: Ai;
+	DOCUMENT_QUEUE: Queue<DocumentMessage>;
+	DLQ: Queue<DocumentMessage>;
+	DOCUMENT_WORKFLOW: Workflow;
+	BATCH_WORKFLOW: Workflow;
+	API_SECRET_KEY: string;
+	AI_GATEWAY_TOKEN: string;
+	OPENAI_API_KEY: string;
+	ORIGIN_URL: string;
+	ENVIRONMENT: string;
 };
 
 // Workflow type placeholder
 interface Workflow {
-  create(params: { params: unknown }): Promise<{ id: string }>;
-  get(id: string): Promise<{ status: string; output?: unknown }>;
+	create(params: { params: unknown }): Promise<{ id: string }>;
+	get(id: string): Promise<{ status: string; output?: unknown }>;
 }
 
 // Queue message types
 interface DocumentMessage {
-  type: 'process_document' | 'generate_embedding' | 'extract_entities';
-  documentId: string;
-  r2Key?: string;
-  text?: string;
-  metadata?: Record<string, unknown>;
-  attempt?: number;
+	type: "process_document" | "generate_embedding" | "extract_entities";
+	documentId: string;
+	r2Key?: string;
+	text?: string;
+	metadata?: Record<string, unknown>;
+	attempt?: number;
 }
 
 type Variables = {
-  requestId: string;
+	requestId: string;
 };
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // Request ID middleware for tracing
-app.use('*', async (c, next) => {
-  c.set('requestId', crypto.randomUUID());
-  await next();
+app.use("*", async (c, next) => {
+	c.set("requestId", crypto.randomUUID());
+	await next();
 });
 
 // CORS configuration
-app.use('/*', cors({
-  origin: ['https://app.epsteinfiles.org', 'https://epsteinfiles.org'],
-  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
-  maxAge: 86400,
-}));
+app.use(
+	"/*",
+	cors({
+		origin: ["https://app.epsteinfiles.org", "https://epsteinfiles.org"],
+		allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+		allowHeaders: ["Content-Type", "Authorization", "X-API-Key"],
+		maxAge: 86400,
+	}),
+);
 
 // Rate limiting middleware using KV
-app.use('/api/*', async (c, next) => {
-  const ip = c.req.header('CF-Connecting-IP') || 'unknown';
-  const key = `ratelimit:${ip}`;
+app.use("/api/*", async (c, next) => {
+	const ip = c.req.header("CF-Connecting-IP") || "unknown";
+	const key = `ratelimit:${ip}`;
 
-  try {
-    const current = await c.env.SESSIONS.get(key);
-    const count = current ? parseInt(current, 10) : 0;
+	try {
+		const current = await c.env.SESSIONS.get(key);
+		const count = current ? Number.parseInt(current, 10) : 0;
 
-    if (count >= 100) { // 100 requests per minute
-      return c.json({ error: 'Rate limit exceeded' }, 429);
-    }
+		if (count >= 100) {
+			// 100 requests per minute
+			return c.json({ error: "Rate limit exceeded" }, 429);
+		}
 
-    await c.env.SESSIONS.put(key, String(count + 1), { expirationTtl: 60 });
-  } catch {
-    // If KV fails, allow request but log warning
-    console.warn('Rate limiting KV unavailable');
-  }
+		await c.env.SESSIONS.put(key, String(count + 1), { expirationTtl: 60 });
+	} catch {
+		// If KV fails, allow request but log warning
+		console.warn("Rate limiting KV unavailable");
+	}
 
-  await next();
+	await next();
 });
 
 // Health check endpoint
-app.get('/health', (c) => {
-  return c.json({
-    status: 'ok',
-    timestamp: Date.now(),
-    environment: c.env.ENVIRONMENT,
-    requestId: c.get('requestId'),
-  });
+app.get("/health", (c) => {
+	return c.json({
+		status: "ok",
+		timestamp: Date.now(),
+		environment: c.env.ENVIRONMENT,
+		requestId: c.get("requestId"),
+	});
 });
 
 // Document retrieval from R2 with caching
 app.get(
-  '/documents/:key{.+}',
-  cache({ cacheName: 'documents', cacheControl: 'public, max-age=86400' }),
-  async (c) => {
-    const key = c.req.param('key');
+	"/documents/:key{.+}",
+	cache({ cacheName: "documents", cacheControl: "public, max-age=86400" }),
+	async (c) => {
+		const key = c.req.param("key");
 
-    try {
-      const object = await c.env.DOCUMENTS.get(key);
+		try {
+			const object = await c.env.DOCUMENTS.get(key);
 
-      if (!object) {
-        return c.json({ error: 'Document not found' }, 404);
-      }
+			if (!object) {
+				return c.json({ error: "Document not found" }, 404);
+			}
 
-      const headers = new Headers();
-      object.writeHttpMetadata(headers);
-      headers.set('etag', object.httpEtag);
-      headers.set('Cache-Control', 'public, max-age=86400');
-      headers.set('X-Request-ID', c.get('requestId'));
+			const headers = new Headers();
+			object.writeHttpMetadata(headers);
+			headers.set("etag", object.httpEtag);
+			headers.set("Cache-Control", "public, max-age=86400");
+			headers.set("X-Request-ID", c.get("requestId"));
 
-      return new Response(object.body, { headers });
-    } catch (error) {
-      console.error('Document retrieval error:', error);
-      return c.json({ error: 'Failed to retrieve document' }, 500);
-    }
-  }
+			return new Response(object.body, { headers });
+		} catch (error) {
+			console.error("Document retrieval error:", error);
+			return c.json({ error: "Failed to retrieve document" }, 500);
+		}
+	},
 );
 
 // Vector search endpoint with embedding generation
-app.post('/search', async (c) => {
-  try {
-    const body = await c.req.json();
-    const { query, limit = 10, filters } = body;
+app.post("/search", async (c) => {
+	try {
+		const body = await c.req.json();
+		const { query, limit = 10, filters } = body;
 
-    if (!query || typeof query !== 'string') {
-      return c.json({ error: 'Query string required' }, 400);
-    }
+		if (!query || typeof query !== "string") {
+			return c.json({ error: "Query string required" }, 400);
+		}
 
-    // Check search cache in D1
-    const queryHash = await hashString(query + JSON.stringify(filters || {}));
+		// Check search cache in D1
+		const queryHash = await hashString(query + JSON.stringify(filters || {}));
 
-    try {
-      const cached = await c.env.CACHE_DB.prepare(
-        'SELECT results FROM search_cache WHERE query_hash = ? AND expires_at > ?'
-      ).bind(queryHash, Date.now()).first<{ results: string }>();
+		try {
+			const cached = await c.env.CACHE_DB.prepare(
+				"SELECT results FROM search_cache WHERE query_hash = ? AND expires_at > ?",
+			)
+				.bind(queryHash, Date.now())
+				.first<{ results: string }>();
 
-      if (cached) {
-        return c.json(JSON.parse(cached.results));
-      }
-    } catch {
-      // Cache miss or D1 unavailable, continue to origin
-    }
+			if (cached) {
+				return c.json(JSON.parse(cached.results));
+			}
+		} catch {
+			// Cache miss or D1 unavailable, continue to origin
+		}
 
-    // Generate embedding using OpenAI text-embedding-3-small (1536-dim)
-    const embeddingApiResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-3-small',
-        input: query,
-        dimensions: 1536,
-      }),
-    });
+		// Generate embedding using OpenAI text-embedding-3-small (1536-dim)
+		const embeddingApiResponse = await fetch("https://api.openai.com/v1/embeddings", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${c.env.OPENAI_API_KEY}`,
+			},
+			body: JSON.stringify({
+				model: "text-embedding-3-small",
+				input: query,
+				dimensions: 1536,
+			}),
+		});
 
-    if (!embeddingApiResponse.ok) {
-      return c.json({ error: 'Failed to generate embedding' }, 500);
-    }
+		if (!embeddingApiResponse.ok) {
+			return c.json({ error: "Failed to generate embedding" }, 500);
+		}
 
-    const embeddingData = await embeddingApiResponse.json() as { data: { embedding: number[] }[] };
-    const embedding = embeddingData.data?.[0]?.embedding;
+		const embeddingData = (await embeddingApiResponse.json()) as {
+			data: { embedding: number[] }[];
+		};
+		const embedding = embeddingData.data?.[0]?.embedding;
 
-    if (!embedding) {
-      return c.json({ error: 'Failed to generate embedding' }, 500);
-    }
+		if (!embedding) {
+			return c.json({ error: "Failed to generate embedding" }, 500);
+		}
 
-    // Forward to origin Qdrant via tunnel
-    const response = await fetch(`${c.env.ORIGIN_URL}/api/search`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': c.env.API_SECRET_KEY,
-        'X-Request-ID': c.get('requestId'),
-      },
-      body: JSON.stringify({
-        vector: embedding,
-        limit,
-        filters,
-      }),
-    });
+		// Forward to origin Qdrant via tunnel
+		const response = await fetch(`${c.env.ORIGIN_URL}/api/search`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"X-API-Key": c.env.API_SECRET_KEY,
+				"X-Request-ID": c.get("requestId"),
+			},
+			body: JSON.stringify({
+				vector: embedding,
+				limit,
+				filters,
+			}),
+		});
 
-    if (!response.ok) {
-      const status = response.status as 502 | 503 | 504;
-      return c.json({ error: 'Search service unavailable' }, status);
-    }
+		if (!response.ok) {
+			const status = response.status as 502 | 503 | 504;
+			return c.json({ error: "Search service unavailable" }, status);
+		}
 
-    const results = await response.json();
+		const results = await response.json();
 
-    // Cache results in D1 for 10 minutes
-    try {
-      await c.env.CACHE_DB.prepare(
-        'INSERT OR REPLACE INTO search_cache (query_hash, results, expires_at) VALUES (?, ?, ?)'
-      ).bind(queryHash, JSON.stringify(results), Date.now() + 600000).run();
-    } catch {
-      // Cache write failed, non-critical
-    }
+		// Cache results in D1 for 10 minutes
+		try {
+			await c.env.CACHE_DB.prepare(
+				"INSERT OR REPLACE INTO search_cache (query_hash, results, expires_at) VALUES (?, ?, ?)",
+			)
+				.bind(queryHash, JSON.stringify(results), Date.now() + 600000)
+				.run();
+		} catch {
+			// Cache write failed, non-critical
+		}
 
-    return c.json(results);
-  } catch (error) {
-    console.error('Search error:', error);
-    return c.json({ error: 'Search failed' }, 500);
-  }
+		return c.json(results);
+	} catch (error) {
+		console.error("Search error:", error);
+		return c.json({ error: "Search failed" }, 500);
+	}
 });
 
 // Entity lookup with D1 caching
-app.get('/entities/:id', async (c) => {
-  const id = c.req.param('id');
+app.get("/entities/:id", async (c) => {
+	const id = c.req.param("id");
 
-  if (!id || !/^[a-zA-Z0-9-]+$/.test(id)) {
-    return c.json({ error: 'Invalid entity ID' }, 400);
-  }
+	if (!id || !/^[a-zA-Z0-9-]+$/.test(id)) {
+		return c.json({ error: "Invalid entity ID" }, 400);
+	}
 
-  try {
-    // Check D1 cache first (1 hour TTL as per PRD)
-    try {
-      const cached = await c.env.CACHE_DB.prepare(
-        'SELECT data FROM entity_cache WHERE id = ? AND expires_at > ?'
-      ).bind(id, Date.now()).first<{ data: string }>();
+	try {
+		// Check D1 cache first (1 hour TTL as per PRD)
+		try {
+			const cached = await c.env.CACHE_DB.prepare(
+				"SELECT data FROM entity_cache WHERE id = ? AND expires_at > ?",
+			)
+				.bind(id, Date.now())
+				.first<{ data: string }>();
 
-      if (cached) {
-        return c.json(JSON.parse(cached.data));
-      }
-    } catch {
-      // Cache miss or D1 unavailable
-    }
+			if (cached) {
+				return c.json(JSON.parse(cached.data));
+			}
+		} catch {
+			// Cache miss or D1 unavailable
+		}
 
-    // Fetch from origin
-    const response = await fetch(`${c.env.ORIGIN_URL}/api/entities/${id}`, {
-      headers: {
-        'X-API-Key': c.env.API_SECRET_KEY,
-        'X-Request-ID': c.get('requestId'),
-      },
-    });
+		// Fetch from origin
+		const response = await fetch(`${c.env.ORIGIN_URL}/api/entities/${id}`, {
+			headers: {
+				"X-API-Key": c.env.API_SECRET_KEY,
+				"X-Request-ID": c.get("requestId"),
+			},
+		});
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        return c.json({ error: 'Entity not found' }, 404);
-      }
-      return c.json({ error: 'Entity service unavailable' }, 502);
-    }
+		if (!response.ok) {
+			if (response.status === 404) {
+				return c.json({ error: "Entity not found" }, 404);
+			}
+			return c.json({ error: "Entity service unavailable" }, 502);
+		}
 
-    const data = await response.json();
+		const data = await response.json();
 
-    // Cache for 1 hour
-    try {
-      await c.env.CACHE_DB.prepare(
-        'INSERT OR REPLACE INTO entity_cache (id, data, expires_at) VALUES (?, ?, ?)'
-      ).bind(id, JSON.stringify(data), Date.now() + 3600000).run();
-    } catch {
-      // Cache write failed, non-critical
-    }
+		// Cache for 1 hour
+		try {
+			await c.env.CACHE_DB.prepare(
+				"INSERT OR REPLACE INTO entity_cache (id, data, expires_at) VALUES (?, ?, ?)",
+			)
+				.bind(id, JSON.stringify(data), Date.now() + 3600000)
+				.run();
+		} catch {
+			// Cache write failed, non-critical
+		}
 
-    return c.json(data);
-  } catch (error) {
-    console.error('Entity lookup error:', error);
-    return c.json({ error: 'Failed to retrieve entity' }, 500);
-  }
+		return c.json(data);
+	} catch (error) {
+		console.error("Entity lookup error:", error);
+		return c.json({ error: "Failed to retrieve entity" }, 500);
+	}
 });
 
 // Graph traversal (proxied to Neo4j via origin)
-app.post('/graph/traverse', async (c) => {
-  try {
-    const body = await c.req.json();
+app.post("/graph/traverse", async (c) => {
+	try {
+		const body = await c.req.json();
 
-    if (!body.startNode) {
-      return c.json({ error: 'startNode required' }, 400);
-    }
+		if (!body.startNode) {
+			return c.json({ error: "startNode required" }, 400);
+		}
 
-    const response = await fetch(`${c.env.ORIGIN_URL}/api/graph/traverse`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': c.env.API_SECRET_KEY,
-        'X-Request-ID': c.get('requestId'),
-      },
-      body: JSON.stringify(body),
-    });
+		const response = await fetch(`${c.env.ORIGIN_URL}/api/graph/traverse`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"X-API-Key": c.env.API_SECRET_KEY,
+				"X-Request-ID": c.get("requestId"),
+			},
+			body: JSON.stringify(body),
+		});
 
-    if (!response.ok) {
-      return c.json({ error: 'Graph service unavailable' }, 502);
-    }
+		if (!response.ok) {
+			return c.json({ error: "Graph service unavailable" }, 502);
+		}
 
-    return response;
-  } catch (error) {
-    console.error('Graph traversal error:', error);
-    return c.json({ error: 'Graph traversal failed' }, 500);
-  }
+		return response;
+	} catch (error) {
+		console.error("Graph traversal error:", error);
+		return c.json({ error: "Graph traversal failed" }, 500);
+	}
 });
 
 // Graph query endpoint for Cypher queries
-app.post('/graph/query', async (c) => {
-  try {
-    const body = await c.req.json();
+app.post("/graph/query", async (c) => {
+	try {
+		const body = await c.req.json();
 
-    if (!body.query) {
-      return c.json({ error: 'Cypher query required' }, 400);
-    }
+		if (!body.query) {
+			return c.json({ error: "Cypher query required" }, 400);
+		}
 
-    const response = await fetch(`${c.env.ORIGIN_URL}/api/graph/query`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': c.env.API_SECRET_KEY,
-        'X-Request-ID': c.get('requestId'),
-      },
-      body: JSON.stringify(body),
-    });
+		const response = await fetch(`${c.env.ORIGIN_URL}/api/graph/query`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"X-API-Key": c.env.API_SECRET_KEY,
+				"X-Request-ID": c.get("requestId"),
+			},
+			body: JSON.stringify(body),
+		});
 
-    if (!response.ok) {
-      return c.json({ error: 'Graph query service unavailable' }, 502);
-    }
+		if (!response.ok) {
+			return c.json({ error: "Graph query service unavailable" }, 502);
+		}
 
-    return response;
-  } catch (error) {
-    console.error('Graph query error:', error);
-    return c.json({ error: 'Graph query failed' }, 500);
-  }
+		return response;
+	} catch (error) {
+		console.error("Graph query error:", error);
+		return c.json({ error: "Graph query failed" }, 500);
+	}
 });
 
 // Text generation endpoint for entity extraction
-app.post('/ai/generate', async (c) => {
-  try {
-    // Verify API key for internal use
-    const apiKey = c.req.header('X-API-Key');
-    if (apiKey !== c.env.API_SECRET_KEY) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+app.post("/ai/generate", async (c) => {
+	try {
+		// Verify API key for internal use
+		const apiKey = c.req.header("X-API-Key");
+		if (apiKey !== c.env.API_SECRET_KEY) {
+			return c.json({ error: "Unauthorized" }, 401);
+		}
 
-    const body = await c.req.json();
-    const { prompt, system, max_tokens = 2048, model = '@cf/meta/llama-3-8b-instruct' } = body;
+		const body = await c.req.json();
+		const { prompt, system, max_tokens = 2048, model = "@cf/meta/llama-3-8b-instruct" } = body;
 
-    if (!prompt || typeof prompt !== 'string') {
-      return c.json({ error: 'Prompt string required' }, 400);
-    }
+		if (!prompt || typeof prompt !== "string") {
+			return c.json({ error: "Prompt string required" }, 400);
+		}
 
-    // Use specified Workers AI model (default: Llama 3 8B)
-    const response = await c.env.AI.run(
-      model as any,
-      {
-        messages: [
-          { role: 'system', content: system || 'You are a helpful assistant.' },
-          { role: 'user', content: prompt }
-        ],
-        max_tokens,
-      },
-      {
-        gateway: {
-          id: 'internal-gateway',
-          headers: {
-            'cf-aig-authorization': `Bearer ${c.env.AI_GATEWAY_TOKEN}`,
-          },
-        },
-      }
-    ) as { response: string };
+		// Use specified Workers AI model (default: Llama 3 8B)
+		const response = (await c.env.AI.run(
+			// biome-ignore lint/suspicious/noExplicitAny: Workers AI model names are dynamic strings
+			model as any,
+			{
+				messages: [
+					{ role: "system", content: system || "You are a helpful assistant." },
+					{ role: "user", content: prompt },
+				],
+				max_tokens,
+			},
+			{
+				gateway: {
+					id: "internal-gateway",
+					headers: {
+						"cf-aig-authorization": `Bearer ${c.env.AI_GATEWAY_TOKEN}`,
+					},
+				},
+			},
+		)) as { response: string };
 
-    return c.json({
-      text: response.response,
-      model,
-    });
-  } catch (error) {
-    console.error('Text generation error:', error);
-    return c.json({ error: 'Text generation failed' }, 500);
-  }
+		return c.json({
+			text: response.response,
+			model,
+		});
+	} catch (error) {
+		console.error("Text generation error:", error);
+		return c.json({ error: "Text generation failed" }, 500);
+	}
 });
 
 // Embedding generation endpoint for document processing
-app.post('/ai/embedding', async (c) => {
-  try {
-    // Verify API key for internal use
-    const apiKey = c.req.header('X-API-Key');
-    if (apiKey !== c.env.API_SECRET_KEY) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+app.post("/ai/embedding", async (c) => {
+	try {
+		// Verify API key for internal use
+		const apiKey = c.req.header("X-API-Key");
+		if (apiKey !== c.env.API_SECRET_KEY) {
+			return c.json({ error: "Unauthorized" }, 401);
+		}
 
-    const body = await c.req.json();
-    const { text } = body;
+		const body = await c.req.json();
+		const { text } = body;
 
-    if (!text || typeof text !== 'string') {
-      return c.json({ error: 'Text string required' }, 400);
-    }
+		if (!text || typeof text !== "string") {
+			return c.json({ error: "Text string required" }, 400);
+		}
 
-    // Generate embedding using OpenAI text-embedding-3-small (1536-dim)
-    const embeddingApiResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-3-small',
-        input: text.slice(0, 8000),
-        dimensions: 1536,
-      }),
-    });
+		// Generate embedding using OpenAI text-embedding-3-small (1536-dim)
+		const embeddingApiResponse = await fetch("https://api.openai.com/v1/embeddings", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${c.env.OPENAI_API_KEY}`,
+			},
+			body: JSON.stringify({
+				model: "text-embedding-3-small",
+				input: text.slice(0, 8000),
+				dimensions: 1536,
+			}),
+		});
 
-    if (!embeddingApiResponse.ok) {
-      return c.json({ error: 'Failed to generate embedding' }, 500);
-    }
+		if (!embeddingApiResponse.ok) {
+			return c.json({ error: "Failed to generate embedding" }, 500);
+		}
 
-    const embeddingData = await embeddingApiResponse.json() as { data: { embedding: number[] }[] };
-    const embedding = embeddingData.data?.[0]?.embedding;
+		const embeddingData = (await embeddingApiResponse.json()) as {
+			data: { embedding: number[] }[];
+		};
+		const embedding = embeddingData.data?.[0]?.embedding;
 
-    if (!embedding) {
-      return c.json({ error: 'Failed to generate embedding' }, 500);
-    }
+		if (!embedding) {
+			return c.json({ error: "Failed to generate embedding" }, 500);
+		}
 
-    return c.json({
-      embedding,
-      dimensions: 1536,
-      model: 'text-embedding-3-small',
-    });
-  } catch (error) {
-    console.error('Embedding generation error:', error);
-    return c.json({ error: 'Embedding generation failed' }, 500);
-  }
+		return c.json({
+			embedding,
+			dimensions: 1536,
+			model: "text-embedding-3-small",
+		});
+	} catch (error) {
+		console.error("Embedding generation error:", error);
+		return c.json({ error: "Embedding generation failed" }, 500);
+	}
 });
 
 // OCR endpoint using Llama 3.2 Vision model
-app.post('/ai/ocr', async (c) => {
-  try {
-    const apiKey = c.req.header('X-API-Key');
-    if (apiKey !== c.env.API_SECRET_KEY) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+app.post("/ai/ocr", async (c) => {
+	try {
+		const apiKey = c.req.header("X-API-Key");
+		if (apiKey !== c.env.API_SECRET_KEY) {
+			return c.json({ error: "Unauthorized" }, 401);
+		}
 
-    const body = await c.req.json();
-    const { image, prompt } = body as { image: string; prompt?: string };
+		const body = await c.req.json();
+		const { image, prompt } = body as { image: string; prompt?: string };
 
-    if (!image || typeof image !== 'string') {
-      return c.json({ error: 'Base64 image required' }, 400);
-    }
+		if (!image || typeof image !== "string") {
+			return c.json({ error: "Base64 image required" }, 400);
+		}
 
-    const ocrPrompt = prompt || `Extract ALL text from this document image exactly as it appears.
+		const ocrPrompt =
+			prompt ||
+			`Extract ALL text from this document image exactly as it appears.
 Instructions:
 - Extract every word, number, date, and character visible
 - Preserve the original formatting as much as possible
@@ -442,440 +461,454 @@ Instructions:
 
 Begin extraction:`;
 
-    // Ensure image is in data URL format
-    const imageUrl = image.startsWith('data:')
-      ? image
-      : `data:image/jpeg;base64,${image}`;
+		// Ensure image is in data URL format
+		const imageUrl = image.startsWith("data:") ? image : `data:image/jpeg;base64,${image}`;
 
-    // Use Llama 3.2 Vision for OCR - use image_url format per docs
-    const response = await c.env.AI.run(
-      '@cf/meta/llama-3.2-11b-vision-instruct' as any,
-      {
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: ocrPrompt,
-              },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: imageUrl,
-                },
-              },
-            ],
-          },
-        ],
-        max_tokens: 4096,
-      },
-      {
-        gateway: {
-          id: 'internal-gateway',
-          headers: {
-            'cf-aig-authorization': `Bearer ${c.env.AI_GATEWAY_TOKEN}`,
-          },
-        },
-      }
-    ) as { response: string };
+		// Use Llama 3.2 Vision for OCR - use image_url format per docs
+		const response = (await c.env.AI.run(
+			// biome-ignore lint/suspicious/noExplicitAny: Workers AI model name not in type definitions
+			"@cf/meta/llama-3.2-11b-vision-instruct" as any,
+			{
+				messages: [
+					{
+						role: "user",
+						content: [
+							{
+								type: "text",
+								text: ocrPrompt,
+							},
+							{
+								type: "image_url",
+								image_url: {
+									url: imageUrl,
+								},
+							},
+						],
+					},
+				],
+				max_tokens: 4096,
+			},
+			{
+				gateway: {
+					id: "internal-gateway",
+					headers: {
+						"cf-aig-authorization": `Bearer ${c.env.AI_GATEWAY_TOKEN}`,
+					},
+				},
+			},
+		)) as { response: string };
 
-    return c.json({
-      text: response.response,
-      model: '@cf/meta/llama-3.2-11b-vision-instruct',
-    });
-  } catch (error) {
-    console.error('OCR error:', error);
-    return c.json({ error: 'OCR failed', details: error instanceof Error ? error.message : 'Unknown' }, 500);
-  }
+		return c.json({
+			text: response.response,
+			model: "@cf/meta/llama-3.2-11b-vision-instruct",
+		});
+	} catch (error) {
+		console.error("OCR error:", error);
+		return c.json(
+			{ error: "OCR failed", details: error instanceof Error ? error.message : "Unknown" },
+			500,
+		);
+	}
 });
 
 // Batch embeddings endpoint for higher throughput
-app.post('/ai/embeddings-batch', async (c) => {
-  try {
-    const apiKey = c.req.header('X-API-Key');
-    if (apiKey !== c.env.API_SECRET_KEY) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+app.post("/ai/embeddings-batch", async (c) => {
+	try {
+		const apiKey = c.req.header("X-API-Key");
+		if (apiKey !== c.env.API_SECRET_KEY) {
+			return c.json({ error: "Unauthorized" }, 401);
+		}
 
-    const body = await c.req.json();
-    const { texts } = body as { texts: string[] };
+		const body = await c.req.json();
+		const { texts } = body as { texts: string[] };
 
-    if (!texts || !Array.isArray(texts) || texts.length === 0) {
-      return c.json({ error: 'texts array required' }, 400);
-    }
+		if (!texts || !Array.isArray(texts) || texts.length === 0) {
+			return c.json({ error: "texts array required" }, 400);
+		}
 
-    // Limit batch size to 100
-    const safeBatch = texts.slice(0, 100).map(t =>
-      typeof t === 'string' ? t.slice(0, 8000) : ''
-    );
+		// Limit batch size to 100
+		const safeBatch = texts
+			.slice(0, 100)
+			.map((t) => (typeof t === "string" ? t.slice(0, 8000) : ""));
 
-    // Generate embeddings using OpenAI text-embedding-3-small (1536-dim)
-    const embeddingApiResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-3-small',
-        input: safeBatch,
-        dimensions: 1536,
-      }),
-    });
+		// Generate embeddings using OpenAI text-embedding-3-small (1536-dim)
+		const embeddingApiResponse = await fetch("https://api.openai.com/v1/embeddings", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${c.env.OPENAI_API_KEY}`,
+			},
+			body: JSON.stringify({
+				model: "text-embedding-3-small",
+				input: safeBatch,
+				dimensions: 1536,
+			}),
+		});
 
-    if (!embeddingApiResponse.ok) {
-      return c.json({ error: 'Failed to generate embeddings' }, 500);
-    }
+		if (!embeddingApiResponse.ok) {
+			return c.json({ error: "Failed to generate embeddings" }, 500);
+		}
 
-    const embeddingData = await embeddingApiResponse.json() as { data: { embedding: number[]; index: number }[] };
+		const embeddingData = (await embeddingApiResponse.json()) as {
+			data: { embedding: number[]; index: number }[];
+		};
 
-    if (!embeddingData?.data) {
-      return c.json({ error: 'Failed to generate embeddings' }, 500);
-    }
+		if (!embeddingData?.data) {
+			return c.json({ error: "Failed to generate embeddings" }, 500);
+		}
 
-    // Sort by index to maintain input order
-    const sortedEmbeddings = embeddingData.data
-      .sort((a, b) => a.index - b.index)
-      .map(d => d.embedding);
+		// Sort by index to maintain input order
+		const sortedEmbeddings = embeddingData.data
+			.sort((a, b) => a.index - b.index)
+			.map((d) => d.embedding);
 
-    return c.json({
-      embeddings: sortedEmbeddings,
-      count: sortedEmbeddings.length,
-      dimensions: 1536,
-    });
-  } catch (error) {
-    console.error('Batch embedding error:', error);
-    return c.json({ error: 'Batch embedding failed' }, 500);
-  }
+		return c.json({
+			embeddings: sortedEmbeddings,
+			count: sortedEmbeddings.length,
+			dimensions: 1536,
+		});
+	} catch (error) {
+		console.error("Batch embedding error:", error);
+		return c.json({ error: "Batch embedding failed" }, 500);
+	}
 });
 
 // Document upload to R2 (internal use only)
-app.put('/documents/:key{.+}', async (c) => {
-  try {
-    // Verify API key for internal use
-    const apiKey = c.req.header('X-API-Key');
-    if (apiKey !== c.env.API_SECRET_KEY) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+app.put("/documents/:key{.+}", async (c) => {
+	try {
+		// Verify API key for internal use
+		const apiKey = c.req.header("X-API-Key");
+		if (apiKey !== c.env.API_SECRET_KEY) {
+			return c.json({ error: "Unauthorized" }, 401);
+		}
 
-    const key = c.req.param('key');
-    const contentType = c.req.header('Content-Type') || 'application/pdf';
-    const body = await c.req.arrayBuffer();
+		const key = c.req.param("key");
+		const contentType = c.req.header("Content-Type") || "application/pdf";
+		const body = await c.req.arrayBuffer();
 
-    if (!body || body.byteLength === 0) {
-      return c.json({ error: 'Empty body' }, 400);
-    }
+		if (!body || body.byteLength === 0) {
+			return c.json({ error: "Empty body" }, 400);
+		}
 
-    // Upload to R2
-    await c.env.DOCUMENTS.put(key, body, {
-      httpMetadata: {
-        contentType,
-      },
-    });
+		// Upload to R2
+		await c.env.DOCUMENTS.put(key, body, {
+			httpMetadata: {
+				contentType,
+			},
+		});
 
-    return c.json({
-      success: true,
-      key,
-      size: body.byteLength,
-      requestId: c.get('requestId'),
-    });
-  } catch (error) {
-    console.error('Document upload error:', error);
-    return c.json({ error: 'Upload failed' }, 500);
-  }
+		return c.json({
+			success: true,
+			key,
+			size: body.byteLength,
+			requestId: c.get("requestId"),
+		});
+	} catch (error) {
+		console.error("Document upload error:", error);
+		return c.json({ error: "Upload failed" }, 500);
+	}
 });
 
 // Face search endpoint
-app.post('/faces/search', async (c) => {
-  try {
-    const body = await c.req.json();
+app.post("/faces/search", async (c) => {
+	try {
+		const body = await c.req.json();
 
-    if (!body.embedding && !body.imageUrl) {
-      return c.json({ error: 'embedding or imageUrl required' }, 400);
-    }
+		if (!body.embedding && !body.imageUrl) {
+			return c.json({ error: "embedding or imageUrl required" }, 400);
+		}
 
-    const response = await fetch(`${c.env.ORIGIN_URL}/api/faces/search`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': c.env.API_SECRET_KEY,
-        'X-Request-ID': c.get('requestId'),
-      },
-      body: JSON.stringify(body),
-    });
+		const response = await fetch(`${c.env.ORIGIN_URL}/api/faces/search`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"X-API-Key": c.env.API_SECRET_KEY,
+				"X-Request-ID": c.get("requestId"),
+			},
+			body: JSON.stringify(body),
+		});
 
-    if (!response.ok) {
-      return c.json({ error: 'Face search service unavailable' }, 502);
-    }
+		if (!response.ok) {
+			return c.json({ error: "Face search service unavailable" }, 502);
+		}
 
-    return response;
-  } catch (error) {
-    console.error('Face search error:', error);
-    return c.json({ error: 'Face search failed' }, 500);
-  }
+		return response;
+	} catch (error) {
+		console.error("Face search error:", error);
+		return c.json({ error: "Face search failed" }, 500);
+	}
 });
 
 // Queue document for processing (batch enqueue)
-app.post('/queue/documents', async (c) => {
-  try {
-    const apiKey = c.req.header('X-API-Key');
-    if (apiKey !== c.env.API_SECRET_KEY) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+app.post("/queue/documents", async (c) => {
+	try {
+		const apiKey = c.req.header("X-API-Key");
+		if (apiKey !== c.env.API_SECRET_KEY) {
+			return c.json({ error: "Unauthorized" }, 401);
+		}
 
-    const body = await c.req.json();
-    const { documents } = body as { documents: Array<{ id: string; r2Key: string; metadata?: Record<string, unknown> }> };
+		const body = await c.req.json();
+		const { documents } = body as {
+			documents: Array<{ id: string; r2Key: string; metadata?: Record<string, unknown> }>;
+		};
 
-    if (!documents || !Array.isArray(documents)) {
-      return c.json({ error: 'documents array required' }, 400);
-    }
+		if (!documents || !Array.isArray(documents)) {
+			return c.json({ error: "documents array required" }, 400);
+		}
 
-    // Batch enqueue - up to 100 messages per batch
-    const messages: MessageSendRequest<DocumentMessage>[] = documents.map(doc => ({
-      body: {
-        type: 'process_document' as const,
-        documentId: doc.id,
-        r2Key: doc.r2Key,
-        metadata: doc.metadata,
-        attempt: 1,
-      },
-    }));
+		// Batch enqueue - up to 100 messages per batch
+		const messages: MessageSendRequest<DocumentMessage>[] = documents.map((doc) => ({
+			body: {
+				type: "process_document" as const,
+				documentId: doc.id,
+				r2Key: doc.r2Key,
+				metadata: doc.metadata,
+				attempt: 1,
+			},
+		}));
 
-    // Send in batches of 100
-    for (let i = 0; i < messages.length; i += 100) {
-      const batch = messages.slice(i, i + 100);
-      await c.env.DOCUMENT_QUEUE.sendBatch(batch);
-    }
+		// Send in batches of 100
+		for (let i = 0; i < messages.length; i += 100) {
+			const batch = messages.slice(i, i + 100);
+			await c.env.DOCUMENT_QUEUE.sendBatch(batch);
+		}
 
-    return c.json({
-      success: true,
-      queued: documents.length,
-      requestId: c.get('requestId'),
-    });
-  } catch (error) {
-    console.error('Queue enqueue error:', error);
-    return c.json({ error: 'Failed to enqueue documents' }, 500);
-  }
+		return c.json({
+			success: true,
+			queued: documents.length,
+			requestId: c.get("requestId"),
+		});
+	} catch (error) {
+		console.error("Queue enqueue error:", error);
+		return c.json({ error: "Failed to enqueue documents" }, 500);
+	}
 });
 
 // Direct batch processing (bypass queue for now)
-app.post('/process/batch', async (c) => {
-  try {
-    const apiKey = c.req.header('X-API-Key');
-    if (apiKey !== c.env.API_SECRET_KEY) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+app.post("/process/batch", async (c) => {
+	try {
+		const apiKey = c.req.header("X-API-Key");
+		if (apiKey !== c.env.API_SECRET_KEY) {
+			return c.json({ error: "Unauthorized" }, 401);
+		}
 
-    const body = await c.req.json().catch(() => ({}));
-    const { limit = 50 } = body as { limit?: number };
-    const safeLimit = Math.min(limit, 200);
+		const body = await c.req.json().catch(() => ({}));
+		const { limit = 50 } = body as { limit?: number };
+		const safeLimit = Math.min(limit, 200);
 
-    // Get unprocessed documents
-    const url = new URL(`${c.env.ORIGIN_URL}/api/documents/unprocessed`);
-    url.searchParams.set('limit', safeLimit.toString());
+		// Get unprocessed documents
+		const url = new URL(`${c.env.ORIGIN_URL}/api/documents/unprocessed`);
+		url.searchParams.set("limit", safeLimit.toString());
 
-    const response = await fetch(url.toString(), {
-      headers: { 'X-API-Key': c.env.API_SECRET_KEY },
-    });
+		const response = await fetch(url.toString(), {
+			headers: { "X-API-Key": c.env.API_SECRET_KEY },
+		});
 
-    if (!response.ok) {
-      return c.json({ error: 'Failed to get documents' }, 502);
-    }
+		if (!response.ok) {
+			return c.json({ error: "Failed to get documents" }, 502);
+		}
 
-    const { documents } = await response.json() as {
-      documents: Array<{ documentId: string; r2Key: string; source: string }>
-    };
+		const { documents } = (await response.json()) as {
+			documents: Array<{ documentId: string; r2Key: string; source: string }>;
+		};
 
-    if (!documents || documents.length === 0) {
-      return c.json({ message: 'No unprocessed documents', processed: 0 });
-    }
+		if (!documents || documents.length === 0) {
+			return c.json({ message: "No unprocessed documents", processed: 0 });
+		}
 
-    const results: Array<{ documentId: string; status: string; error?: string }> = [];
+		const results: Array<{ documentId: string; status: string; error?: string }> = [];
 
-    // Process a single document (extracted for parallel execution)
-    async function processDocument(doc: { documentId: string; r2Key: string; source: string }): Promise<{ documentId: string; status: string; error?: string }> {
-      try {
-        // Get PDF from R2
-        const object = await c.env.DOCUMENTS.get(doc.r2Key);
-        if (!object) {
-          return { documentId: doc.documentId, status: 'not_found' };
-        }
+		// Process a single document (extracted for parallel execution)
+		async function processDocument(doc: {
+			documentId: string;
+			r2Key: string;
+			source: string;
+		}): Promise<{ documentId: string; status: string; error?: string }> {
+			try {
+				// Get PDF from R2
+				const object = await c.env.DOCUMENTS.get(doc.r2Key);
+				if (!object) {
+					return { documentId: doc.documentId, status: "not_found" };
+				}
 
-        // Read and encode PDF
-        const pdfArrayBuffer = await object.arrayBuffer();
-        if (pdfArrayBuffer.byteLength > 10 * 1024 * 1024) {
-          return { documentId: doc.documentId, status: 'too_large' };
-        }
+				// Read and encode PDF
+				const pdfArrayBuffer = await object.arrayBuffer();
+				if (pdfArrayBuffer.byteLength > 10 * 1024 * 1024) {
+					return { documentId: doc.documentId, status: "too_large" };
+				}
 
-        const pdfBytes = new Uint8Array(pdfArrayBuffer);
-        let pdfBinary = '';
-        const byteChunkSize = 32768;
-        for (let i = 0; i < pdfBytes.length; i += byteChunkSize) {
-          const chunk = pdfBytes.subarray(i, i + byteChunkSize);
-          pdfBinary += String.fromCharCode.apply(null, [...chunk]);
-        }
-        const pdfBase64 = btoa(pdfBinary);
+				const pdfBytes = new Uint8Array(pdfArrayBuffer);
+				let pdfBinary = "";
+				const byteChunkSize = 32768;
+				for (let i = 0; i < pdfBytes.length; i += byteChunkSize) {
+					const chunk = pdfBytes.subarray(i, i + byteChunkSize);
+					pdfBinary += String.fromCharCode.apply(null, [...chunk]);
+				}
+				const pdfBase64 = btoa(pdfBinary);
 
-        // Extract text
-        const extractResponse = await fetch(`${c.env.ORIGIN_URL}/api/extract`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-API-Key': c.env.API_SECRET_KEY,
-          },
-          body: JSON.stringify({
-            r2Key: doc.r2Key,
-            documentId: doc.documentId,
-            pdfContent: pdfBase64
-          }),
-        });
+				// Extract text
+				const extractResponse = await fetch(`${c.env.ORIGIN_URL}/api/extract`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						"X-API-Key": c.env.API_SECRET_KEY,
+					},
+					body: JSON.stringify({
+						r2Key: doc.r2Key,
+						documentId: doc.documentId,
+						pdfContent: pdfBase64,
+					}),
+				});
 
-        if (!extractResponse.ok) {
-          return { documentId: doc.documentId, status: 'extract_failed' };
-        }
+				if (!extractResponse.ok) {
+					return { documentId: doc.documentId, status: "extract_failed" };
+				}
 
-        const { text } = await extractResponse.json() as { text: string };
+				const { text } = (await extractResponse.json()) as { text: string };
 
-        if (text && text.length > 100) {
-          // Generate embedding using OpenAI text-embedding-3-small (1536-dim)
-          const embeddingApiResponse = await fetch('https://api.openai.com/v1/embeddings', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`,
-            },
-            body: JSON.stringify({
-              model: 'text-embedding-3-small',
-              input: text.slice(0, 8000),
-              dimensions: 1536,
-            }),
-          });
+				if (text && text.length > 100) {
+					// Generate embedding using OpenAI text-embedding-3-small (1536-dim)
+					const embeddingApiResponse = await fetch("https://api.openai.com/v1/embeddings", {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							Authorization: `Bearer ${c.env.OPENAI_API_KEY}`,
+						},
+						body: JSON.stringify({
+							model: "text-embedding-3-small",
+							input: text.slice(0, 8000),
+							dimensions: 1536,
+						}),
+					});
 
-          if (embeddingApiResponse.ok) {
-            const embeddingData = await embeddingApiResponse.json() as { data: { embedding: number[] }[] };
-            const embedding = embeddingData.data?.[0]?.embedding;
-            if (embedding) {
-              // Store embedding
-              await fetch(`${c.env.ORIGIN_URL}/api/embeddings`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'X-API-Key': c.env.API_SECRET_KEY,
-                },
-                body: JSON.stringify({
-                  documentId: doc.documentId,
-                  embedding,
-                  metadata: { source: doc.source },
-                }),
-              });
-            }
-          }
-        }
+					if (embeddingApiResponse.ok) {
+						const embeddingData = (await embeddingApiResponse.json()) as {
+							data: { embedding: number[] }[];
+						};
+						const embedding = embeddingData.data?.[0]?.embedding;
+						if (embedding) {
+							// Store embedding
+							await fetch(`${c.env.ORIGIN_URL}/api/embeddings`, {
+								method: "POST",
+								headers: {
+									"Content-Type": "application/json",
+									"X-API-Key": c.env.API_SECRET_KEY,
+								},
+								body: JSON.stringify({
+									documentId: doc.documentId,
+									embedding,
+									metadata: { source: doc.source },
+								}),
+							});
+						}
+					}
+				}
 
-        return { documentId: doc.documentId, status: 'completed' };
-      } catch (error) {
-        return {
-          documentId: doc.documentId,
-          status: 'error',
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
-    }
+				return { documentId: doc.documentId, status: "completed" };
+			} catch (error) {
+				return {
+					documentId: doc.documentId,
+					status: "error",
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		}
 
-    // Process documents in parallel chunks of 5 (SEC-11)
-    const CHUNK_SIZE = 5;
-    for (let i = 0; i < documents.length; i += CHUNK_SIZE) {
-      const chunk = documents.slice(i, i + CHUNK_SIZE);
-      const chunkResults = await Promise.all(chunk.map(processDocument));
-      results.push(...chunkResults);
-    }
+		// Process documents in parallel chunks of 5 (SEC-11)
+		const CHUNK_SIZE = 5;
+		for (let i = 0; i < documents.length; i += CHUNK_SIZE) {
+			const chunk = documents.slice(i, i + CHUNK_SIZE);
+			const chunkResults = await Promise.all(chunk.map(processDocument));
+			results.push(...chunkResults);
+		}
 
-    const completed = results.filter(r => r.status === 'completed').length;
-    return c.json({
-      success: true,
-      processed: documents.length,
-      completed,
-      failed: documents.length - completed,
-      results,
-      requestId: c.get('requestId'),
-    });
-  } catch (error) {
-    console.error('Batch processing error:', error);
-    return c.json({ error: 'Batch processing failed' }, 500);
-  }
+		const completed = results.filter((r) => r.status === "completed").length;
+		return c.json({
+			success: true,
+			processed: documents.length,
+			completed,
+			failed: documents.length - completed,
+			results,
+			requestId: c.get("requestId"),
+		});
+	} catch (error) {
+		console.error("Batch processing error:", error);
+		return c.json({ error: "Batch processing failed" }, 500);
+	}
 });
 
 // Scan and queue unprocessed documents
-app.post('/queue/scan-unprocessed', async (c) => {
-  try {
-    const apiKey = c.req.header('X-API-Key');
-    if (apiKey !== c.env.API_SECRET_KEY) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+app.post("/queue/scan-unprocessed", async (c) => {
+	try {
+		const apiKey = c.req.header("X-API-Key");
+		if (apiKey !== c.env.API_SECRET_KEY) {
+			return c.json({ error: "Unauthorized" }, 401);
+		}
 
-    const body = await c.req.json().catch(() => ({}));
-    const { limit = 100, source } = body as { limit?: number; source?: string };
-    const safeLimit = Math.min(limit, 500);
+		const body = await c.req.json().catch(() => ({}));
+		const { limit = 100, source } = body as { limit?: number; source?: string };
+		const safeLimit = Math.min(limit, 500);
 
-    // Get unprocessed documents from origin API
-    const url = new URL(`${c.env.ORIGIN_URL}/api/documents/unprocessed`);
-    url.searchParams.set('limit', safeLimit.toString());
-    if (source) url.searchParams.set('source', source);
+		// Get unprocessed documents from origin API
+		const url = new URL(`${c.env.ORIGIN_URL}/api/documents/unprocessed`);
+		url.searchParams.set("limit", safeLimit.toString());
+		if (source) url.searchParams.set("source", source);
 
-    const response = await fetch(url.toString(), {
-      headers: { 'X-API-Key': c.env.API_SECRET_KEY },
-    });
+		const response = await fetch(url.toString(), {
+			headers: { "X-API-Key": c.env.API_SECRET_KEY },
+		});
 
-    if (!response.ok) {
-      return c.json({ error: 'Failed to get unprocessed documents' }, 502);
-    }
+		if (!response.ok) {
+			return c.json({ error: "Failed to get unprocessed documents" }, 502);
+		}
 
-    const { documents } = await response.json() as { documents: Array<{ documentId: string; r2Key: string; source: string }> };
+		const { documents } = (await response.json()) as {
+			documents: Array<{ documentId: string; r2Key: string; source: string }>;
+		};
 
-    if (!documents || documents.length === 0) {
-      return c.json({ message: 'No unprocessed documents found', queued: 0 });
-    }
+		if (!documents || documents.length === 0) {
+			return c.json({ message: "No unprocessed documents found", queued: 0 });
+		}
 
-    // Queue for processing
-    const messages: MessageSendRequest<DocumentMessage>[] = documents.map(doc => ({
-      body: {
-        type: 'process_document' as const,
-        documentId: doc.documentId,
-        r2Key: doc.r2Key,
-        metadata: { source: doc.source },
-        attempt: 1,
-      },
-    }));
+		// Queue for processing
+		const messages: MessageSendRequest<DocumentMessage>[] = documents.map((doc) => ({
+			body: {
+				type: "process_document" as const,
+				documentId: doc.documentId,
+				r2Key: doc.r2Key,
+				metadata: { source: doc.source },
+				attempt: 1,
+			},
+		}));
 
-    // Send in batches of 100
-    for (let i = 0; i < messages.length; i += 100) {
-      const batch = messages.slice(i, i + 100);
-      await c.env.DOCUMENT_QUEUE.sendBatch(batch);
-    }
+		// Send in batches of 100
+		for (let i = 0; i < messages.length; i += 100) {
+			const batch = messages.slice(i, i + 100);
+			await c.env.DOCUMENT_QUEUE.sendBatch(batch);
+		}
 
-    return c.json({
-      success: true,
-      queued: documents.length,
-      source: source || 'all',
-      requestId: c.get('requestId'),
-    });
-  } catch (error) {
-    console.error('Scan unprocessed error:', error);
-    return c.json({ error: 'Failed to scan and queue' }, 500);
-  }
+		return c.json({
+			success: true,
+			queued: documents.length,
+			source: source || "all",
+			requestId: c.get("requestId"),
+		});
+	} catch (error) {
+		console.error("Scan unprocessed error:", error);
+		return c.json({ error: "Failed to scan and queue" }, 500);
+	}
 });
 
 // Queue status endpoint
-app.get('/queue/status', async (c) => {
-  try {
-    const apiKey = c.req.header('X-API-Key');
-    if (apiKey !== c.env.API_SECRET_KEY) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+app.get("/queue/status", async (c) => {
+	try {
+		const apiKey = c.req.header("X-API-Key");
+		if (apiKey !== c.env.API_SECRET_KEY) {
+			return c.json({ error: "Unauthorized" }, 401);
+		}
 
-    // Check processing stats from D1
-    const stats = await c.env.CACHE_DB.prepare(`
+		// Check processing stats from D1
+		const stats = await c.env.CACHE_DB.prepare(`
       SELECT
         COUNT(*) as total,
         SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
@@ -885,217 +918,223 @@ app.get('/queue/status', async (c) => {
       FROM processing_jobs
     `).first();
 
-    return c.json({
-      stats: stats || { total: 0, pending: 0, processing: 0, completed: 0, failed: 0 },
-      requestId: c.get('requestId'),
-    });
-  } catch (error) {
-    console.error('Queue status error:', error);
-    return c.json({ error: 'Failed to get queue status' }, 500);
-  }
+		return c.json({
+			stats: stats || { total: 0, pending: 0, processing: 0, completed: 0, failed: 0 },
+			requestId: c.get("requestId"),
+		});
+	} catch (error) {
+		console.error("Queue status error:", error);
+		return c.json({ error: "Failed to get queue status" }, 500);
+	}
 });
 
 // Trigger workflow for single document
-app.post('/workflow/document', async (c) => {
-  try {
-    const apiKey = c.req.header('X-API-Key');
-    if (apiKey !== c.env.API_SECRET_KEY) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+app.post("/workflow/document", async (c) => {
+	try {
+		const apiKey = c.req.header("X-API-Key");
+		if (apiKey !== c.env.API_SECRET_KEY) {
+			return c.json({ error: "Unauthorized" }, 401);
+		}
 
-    const body = await c.req.json();
-    const { documentId, r2Key, source, metadata } = body as {
-      documentId: string;
-      r2Key: string;
-      source: string;
-      metadata?: Record<string, unknown>;
-    };
+		const body = await c.req.json();
+		const { documentId, r2Key, source, metadata } = body as {
+			documentId: string;
+			r2Key: string;
+			source: string;
+			metadata?: Record<string, unknown>;
+		};
 
-    if (!documentId || !r2Key) {
-      return c.json({ error: 'documentId and r2Key required' }, 400);
-    }
+		if (!documentId || !r2Key) {
+			return c.json({ error: "documentId and r2Key required" }, 400);
+		}
 
-    const instance = await c.env.DOCUMENT_WORKFLOW.create({
-      params: { documentId, r2Key, source, metadata },
-    });
+		const instance = await c.env.DOCUMENT_WORKFLOW.create({
+			params: { documentId, r2Key, source, metadata },
+		});
 
-    return c.json({
-      workflowId: instance.id,
-      status: 'started',
-      requestId: c.get('requestId'),
-    });
-  } catch (error) {
-    console.error('Workflow trigger error:', error);
-    return c.json({ error: 'Failed to start workflow' }, 500);
-  }
+		return c.json({
+			workflowId: instance.id,
+			status: "started",
+			requestId: c.get("requestId"),
+		});
+	} catch (error) {
+		console.error("Workflow trigger error:", error);
+		return c.json({ error: "Failed to start workflow" }, 500);
+	}
 });
 
 // Trigger batch workflow for multiple documents
-app.post('/workflow/batch', async (c) => {
-  try {
-    const apiKey = c.req.header('X-API-Key');
-    if (apiKey !== c.env.API_SECRET_KEY) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+app.post("/workflow/batch", async (c) => {
+	try {
+		const apiKey = c.req.header("X-API-Key");
+		if (apiKey !== c.env.API_SECRET_KEY) {
+			return c.json({ error: "Unauthorized" }, 401);
+		}
 
-    const body = await c.req.json();
-    const { documents } = body as {
-      documents: Array<{ documentId: string; r2Key: string; source: string }>;
-    };
+		const body = await c.req.json();
+		const { documents } = body as {
+			documents: Array<{ documentId: string; r2Key: string; source: string }>;
+		};
 
-    if (!documents || !Array.isArray(documents)) {
-      return c.json({ error: 'documents array required' }, 400);
-    }
+		if (!documents || !Array.isArray(documents)) {
+			return c.json({ error: "documents array required" }, 400);
+		}
 
-    const instance = await c.env.BATCH_WORKFLOW.create({
-      params: { documents },
-    });
+		const instance = await c.env.BATCH_WORKFLOW.create({
+			params: { documents },
+		});
 
-    return c.json({
-      workflowId: instance.id,
-      documentsCount: documents.length,
-      status: 'started',
-      requestId: c.get('requestId'),
-    });
-  } catch (error) {
-    console.error('Batch workflow trigger error:', error);
-    return c.json({ error: 'Failed to start batch workflow' }, 500);
-  }
+		return c.json({
+			workflowId: instance.id,
+			documentsCount: documents.length,
+			status: "started",
+			requestId: c.get("requestId"),
+		});
+	} catch (error) {
+		console.error("Batch workflow trigger error:", error);
+		return c.json({ error: "Failed to start batch workflow" }, 500);
+	}
 });
 
 // Get workflow status
-app.get('/workflow/:id', async (c) => {
-  try {
-    const apiKey = c.req.header('X-API-Key');
-    if (apiKey !== c.env.API_SECRET_KEY) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+app.get("/workflow/:id", async (c) => {
+	try {
+		const apiKey = c.req.header("X-API-Key");
+		if (apiKey !== c.env.API_SECRET_KEY) {
+			return c.json({ error: "Unauthorized" }, 401);
+		}
 
-    const workflowId = c.req.param('id');
-    const instance = await c.env.DOCUMENT_WORKFLOW.get(workflowId);
+		const workflowId = c.req.param("id");
+		const instance = await c.env.DOCUMENT_WORKFLOW.get(workflowId);
 
-    return c.json({
-      workflowId,
-      status: instance.status,
-      output: instance.output,
-      requestId: c.get('requestId'),
-    });
-  } catch (error) {
-    console.error('Workflow status error:', error);
-    return c.json({ error: 'Failed to get workflow status' }, 500);
-  }
+		return c.json({
+			workflowId,
+			status: instance.status,
+			output: instance.output,
+			requestId: c.get("requestId"),
+		});
+	} catch (error) {
+		console.error("Workflow status error:", error);
+		return c.json({ error: "Failed to get workflow status" }, 500);
+	}
 });
 
 // List R2 objects for database sync
-app.get('/r2/list', async (c) => {
-  try {
-    const apiKey = c.req.header('X-API-Key');
-    if (apiKey !== c.env.API_SECRET_KEY) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+app.get("/r2/list", async (c) => {
+	try {
+		const apiKey = c.req.header("X-API-Key");
+		if (apiKey !== c.env.API_SECRET_KEY) {
+			return c.json({ error: "Unauthorized" }, 401);
+		}
 
-    const prefix = c.req.query('prefix') || '';
-    const cursor = c.req.query('cursor');
-    const limit = Math.min(parseInt(c.req.query('limit') || '1000'), 1000);
+		const prefix = c.req.query("prefix") || "";
+		const cursor = c.req.query("cursor");
+		const limit = Math.min(Number.parseInt(c.req.query("limit") || "1000"), 1000);
 
-    const listed = await c.env.DOCUMENTS.list({
-      prefix,
-      cursor: cursor || undefined,
-      limit,
-    });
+		const listed = await c.env.DOCUMENTS.list({
+			prefix,
+			cursor: cursor || undefined,
+			limit,
+		});
 
-    const objects = listed.objects.map(obj => ({
-      key: obj.key,
-      size: obj.size,
-      uploaded: obj.uploaded.toISOString(),
-    }));
+		const objects = listed.objects.map((obj) => ({
+			key: obj.key,
+			size: obj.size,
+			uploaded: obj.uploaded.toISOString(),
+		}));
 
-    return c.json({
-      objects,
-      cursor: listed.truncated ? listed.cursor : null,
-      truncated: listed.truncated,
-      count: objects.length,
-    });
-  } catch (error) {
-    console.error('R2 list error:', error);
-    return c.json({ error: 'Failed to list R2 objects' }, 500);
-  }
+		return c.json({
+			objects,
+			cursor: listed.truncated ? listed.cursor : null,
+			truncated: listed.truncated,
+			count: objects.length,
+		});
+	} catch (error) {
+		console.error("R2 list error:", error);
+		return c.json({ error: "Failed to list R2 objects" }, 500);
+	}
 });
 
 // Sync R2 keys with database - updates documents where filename matches
-app.post('/r2/sync', async (c) => {
-  try {
-    const apiKey = c.req.header('X-API-Key');
-    if (apiKey !== c.env.API_SECRET_KEY) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+app.post("/r2/sync", async (c) => {
+	try {
+		const apiKey = c.req.header("X-API-Key");
+		if (apiKey !== c.env.API_SECRET_KEY) {
+			return c.json({ error: "Unauthorized" }, 401);
+		}
 
-    const body = await c.req.json();
-    const { r2Keys } = body as { r2Keys: Array<{ key: string; size: number }> };
+		const body = await c.req.json();
+		const { r2Keys } = body as { r2Keys: Array<{ key: string; size: number }> };
 
-    if (!r2Keys || !Array.isArray(r2Keys)) {
-      return c.json({ error: 'r2Keys array required' }, 400);
-    }
+		if (!r2Keys || !Array.isArray(r2Keys)) {
+			return c.json({ error: "r2Keys array required" }, 400);
+		}
 
-    // Send to backend for database update
-    const response = await fetch(`${c.env.ORIGIN_URL}/api/documents/sync-r2-keys`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': c.env.API_SECRET_KEY,
-      },
-      body: JSON.stringify({ r2Keys }),
-    });
+		// Send to backend for database update
+		const response = await fetch(`${c.env.ORIGIN_URL}/api/documents/sync-r2-keys`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"X-API-Key": c.env.API_SECRET_KEY,
+			},
+			body: JSON.stringify({ r2Keys }),
+		});
 
-    if (!response.ok) {
-      return c.json({ error: 'Backend sync failed' }, 502);
-    }
+		if (!response.ok) {
+			return c.json({ error: "Backend sync failed" }, 502);
+		}
 
-    return response;
-  } catch (error) {
-    console.error('R2 sync error:', error);
-    return c.json({ error: 'Sync failed' }, 500);
-  }
+		return response;
+	} catch (error) {
+		console.error("R2 sync error:", error);
+		return c.json({ error: "Sync failed" }, 500);
+	}
 });
 
 // 404 handler
 app.notFound((c) => {
-  return c.json({
-    error: 'Not Found',
-    path: c.req.path,
-    requestId: c.get('requestId'),
-  }, 404);
+	return c.json(
+		{
+			error: "Not Found",
+			path: c.req.path,
+			requestId: c.get("requestId"),
+		},
+		404,
+	);
 });
 
 // Error handler
 app.onError((err, c) => {
-  console.error('Unhandled error:', err);
-  return c.json({
-    error: 'Internal Server Error',
-    requestId: c.get('requestId'),
-  }, 500);
+	console.error("Unhandled error:", err);
+	return c.json(
+		{
+			error: "Internal Server Error",
+			requestId: c.get("requestId"),
+		},
+		500,
+	);
 });
 
 // Utility function to hash strings for cache keys
 async function hashString(str: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(str);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+	const encoder = new TextEncoder();
+	const data = encoder.encode(str);
+	const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+	const hashArray = Array.from(new Uint8Array(hashBuffer));
+	return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 // Re-export workflow classes
-export { DocumentProcessingWorkflow, BatchProcessingWorkflow } from './workflow';
+export { DocumentProcessingWorkflow, BatchProcessingWorkflow } from "./workflow";
 
 // Export handler with proper types
 export default {
-  fetch: app.fetch,
-  async queue(batch: MessageBatch<DocumentMessage>, env: Bindings): Promise<void> {
-    // Queue consumer removed — direct batch processing via /process/batch is the primary method.
-    // See docs/plans/2026-03-07-phase1-foundation-design.md for rationale.
-    for (const message of batch.messages) {
-      message.ack();
-    }
-  },
+	fetch: app.fetch,
+	async queue(batch: MessageBatch<DocumentMessage>, env: Bindings): Promise<void> {
+		// Queue consumer removed — direct batch processing via /process/batch is the primary method.
+		// See docs/plans/2026-03-07-phase1-foundation-design.md for rationale.
+		for (const message of batch.messages) {
+			message.ack();
+		}
+	},
 };

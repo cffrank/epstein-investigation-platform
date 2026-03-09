@@ -48,10 +48,7 @@ export function buildFulltextSearchQuery(
  * Build a capped count query using a CTE with LIMIT 10001.
  * Frontend shows "10,000+" when count equals 10001.
  */
-export function buildCappedCountQuery(
-	whereClause: string,
-	params: unknown[],
-): SqlQuery {
+export function buildCappedCountQuery(whereClause: string, params: unknown[]): SqlQuery {
 	const text = `WITH capped AS (
     SELECT 1 FROM documents WHERE ${whereClause} LIMIT 10001
   )

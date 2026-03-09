@@ -16,18 +16,18 @@ export function neo4jClient(platform: App.Platform) {
 	return {
 		async query(
 			cypher: string,
-			params: Record<string, unknown> = {}
+			params: Record<string, unknown> = {},
 		): Promise<{ columns: string[]; rows: unknown[][] }> {
 			const response = await fetch(`${baseUrl}/mcp/neo4j/db/neo4j/tx/commit`, {
-				method: 'POST',
+				method: "POST",
 				headers: {
-					'Content-Type': 'application/json',
-					'X-API-Key': apiKey,
-					Accept: 'application/json'
+					"Content-Type": "application/json",
+					"X-API-Key": apiKey,
+					Accept: "application/json",
 				},
 				body: JSON.stringify({
-					statements: [{ statement: cypher, parameters: params }]
-				})
+					statements: [{ statement: cypher, parameters: params }],
+				}),
 			});
 
 			if (!response.ok) {
@@ -43,8 +43,8 @@ export function neo4jClient(platform: App.Platform) {
 			const result = data.results[0];
 			return {
 				columns: result.columns,
-				rows: result.data.map((d) => d.row)
+				rows: result.data.map((d) => d.row),
 			};
-		}
+		},
 	};
 }

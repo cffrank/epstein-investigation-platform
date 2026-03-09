@@ -1,11 +1,11 @@
-import type { PageServerLoad } from './$types';
-import { neo4jClient } from '$lib/server/neo4j';
-import type { Entity, EntityType } from '$lib/types';
+import { neo4jClient } from "$lib/server/neo4j";
+import type { Entity, EntityType } from "$lib/types";
+import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ platform }) => {
 	if (!platform?.env) {
 		return {
-			entities: []
+			entities: [],
 		};
 	}
 
@@ -30,16 +30,16 @@ export const load: PageServerLoad = async ({ platform }) => {
 			type: row[2] as EntityType,
 			connections: row[3] as number,
 			document_count: 0,
-			properties: {}
+			properties: {},
 		}));
 
 		return {
-			entities
+			entities,
 		};
 	} catch (error) {
-		console.error('Entity load error:', error);
+		console.error("Entity load error:", error);
 		return {
-			entities: []
+			entities: [],
 		};
 	}
 };

@@ -1,9 +1,9 @@
-import DOMPurify from 'isomorphic-dompurify';
 import {
-	SEARCH_SNIPPET_SANITIZE_CONFIG,
 	CHAT_CONTENT_SANITIZE_CONFIG,
-	DOCUMENT_TEXT_SANITIZE_CONFIG
-} from '@epstein/shared';
+	DOCUMENT_TEXT_SANITIZE_CONFIG,
+	SEARCH_SNIPPET_SANITIZE_CONFIG,
+} from "@epstein/shared";
+import DOMPurify from "isomorphic-dompurify";
 
 /**
  * Sanitize search result snippets. Only allows <mark> tags for highlighting.

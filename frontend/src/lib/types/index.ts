@@ -29,7 +29,7 @@ export interface SearchResponse {
 	mode: SearchMode;
 }
 
-export type SearchMode = 'fulltext' | 'semantic' | 'hybrid';
+export type SearchMode = "fulltext" | "semantic" | "hybrid";
 
 export interface SearchFilters {
 	dateRange?: [string, string];
@@ -57,7 +57,7 @@ export interface Entity {
 	connections?: number;
 }
 
-export type EntityType = 'Person' | 'Organization' | 'Location';
+export type EntityType = "Person" | "Organization" | "Location";
 
 export interface EntityRef {
 	id: string;
@@ -91,7 +91,7 @@ export interface EntityProfile {
 export interface GraphNode {
 	id: string;
 	label: string;
-	type: EntityType | 'Document';
+	type: EntityType | "Document";
 	properties: Record<string, unknown>;
 }
 
@@ -112,14 +112,14 @@ export interface ToolCall {
 	id: string;
 	name: string;
 	input?: Record<string, unknown>;
-	status: 'running' | 'complete' | 'error';
+	status: "running" | "complete" | "error";
 	resultCount?: number;
 	error?: string;
 }
 
 // Native citation from Anthropic API
 export interface NativeCitation {
-	type: 'char_location' | 'page_location' | 'content_block_location';
+	type: "char_location" | "page_location" | "content_block_location";
 	cited_text: string;
 	document_index: number;
 	document_title: string;
@@ -129,10 +129,10 @@ export interface NativeCitation {
 }
 
 // Model selection keys
-export type ModelKey = 'haiku-4.5' | 'sonnet-4.6' | 'opus-4.6';
+export type ModelKey = "haiku-4.5" | "sonnet-4.6" | "opus-4.6";
 
 export interface ChatMessage {
-	role: 'user' | 'assistant';
+	role: "user" | "assistant";
 	content: string;
 	citations?: NativeCitation[];
 	toolCalls?: ToolCall[];

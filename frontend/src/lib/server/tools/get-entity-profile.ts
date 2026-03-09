@@ -1,25 +1,24 @@
-import type Anthropic from '@anthropic-ai/sdk';
-import { neo4jClient } from '$lib/server/neo4j';
+import { neo4jClient } from "$lib/server/neo4j";
+import type Anthropic from "@anthropic-ai/sdk";
 
 export const getEntityProfileTool: Anthropic.Messages.Tool = {
-	name: 'get_entity_profile',
+	name: "get_entity_profile",
 	description:
-		'Get a detailed profile of a person, organization, or location from the knowledge graph, including their connections and document mentions.',
+		"Get a detailed profile of a person, organization, or location from the knowledge graph, including their connections and document mentions.",
 	input_schema: {
-		type: 'object' as const,
+		type: "object" as const,
 		properties: {
 			name: {
-				type: 'string',
-				description: 'Name of the entity to look up (case-insensitive partial match).',
+				type: "string",
+				description: "Name of the entity to look up (case-insensitive partial match).",
 			},
 			type: {
-				type: 'string',
-				enum: ['Person', 'Organization', 'Location'],
-				description:
-					'Optional entity type filter. If omitted, searches all entity types.',
+				type: "string",
+				enum: ["Person", "Organization", "Location"],
+				description: "Optional entity type filter. If omitted, searches all entity types.",
 			},
 		},
-		required: ['name'],
+		required: ["name"],
 	},
 };
 
@@ -31,14 +30,12 @@ interface ConnectionRow {
 
 export async function executeGetEntityProfile(
 	input: { name: string; type?: string },
-	platform: App.Platform
-): Promise<Anthropic.Messages.ToolResultBlockParam['content']> {
+	platform: App.Platform,
+): Promise<Anthropic.Messages.ToolResultBlockParam["content"]> {
 	const neo4j = neo4jClient(platform);
 
 	// Build Cypher query with parameterized values (CR-002 security requirement)
-	const typeFilter = input.type
-		? `AND $type IN labels(e)`
-		: '';
+	const typeFilter = input.type ? "AND $type IN labels(e)" : "";
 
 	const result = await neo4j.query(
 		`MATCH (e)
@@ -49,30 +46,30 @@ export async function executeGetEntityProfile(
 		RETURN e.name as name, labels(e) as entityLabels,
 			e.aliases as aliases, e.description as description,
 			collect(DISTINCT {type: relType, target: targetName, targetLabels: targetLabels})[..50] as connections`,
-		{ name: input.name, type: input.type || null }
+		{ name: input.name, type: input.type || null },
 	);
 
 	if (result.rows.length === 0 || !result.rows[0][0]) {
 		return [
 			{
-				type: 'text' as const,
-				text: `No entity found matching "${input.name}"${input.type ? ` of type ${input.type}` : ''} in the knowledge graph.`,
+				type: "text" as const,
+				text: `No entity found matching "${input.name}"${input.type ? ` of type ${input.type}` : ""} in the knowledge graph.`,
 			},
 		];
 	}
 
 	const row = result.rows[0];
 	const name = row[0] as string;
-	const labels = (row[1] as string[]).filter((l) => l !== 'Entity');
+	const labels = (row[1] as string[]).filter((l) => l !== "Entity");
 	const aliases = row[2] as string[] | null;
 	const description = row[3] as string | null;
 	const connections = row[4] as ConnectionRow[];
 
 	// Format entity profile as readable text
 	let profileText = `# ${name}\n`;
-	profileText += `Type: ${labels.join(', ')}\n`;
+	profileText += `Type: ${labels.join(", ")}\n`;
 	if (aliases && aliases.length > 0) {
-		profileText += `Aliases: ${aliases.join(', ')}\n`;
+		profileText += `Aliases: ${aliases.join(", ")}\n`;
 	}
 	if (description) {
 		profileText += `\n${description}\n`;
@@ -83,9 +80,9 @@ export async function executeGetEntityProfile(
 		const grouped = new Map<string, string[]>();
 		for (const conn of connections) {
 			if (!conn.target) continue;
-			const key = conn.type || 'RELATED_TO';
+			const key = conn.type || "RELATED_TO";
 			if (!grouped.has(key)) grouped.set(key, []);
-			grouped.get(key)!.push(conn.target);
+			grouped.get(key)?.push(conn.target);
 		}
 		for (const [relType, targets] of grouped) {
 			profileText += `\n### ${relType}\n`;
@@ -100,12 +97,12 @@ export async function executeGetEntityProfile(
 
 	return [
 		{
-			type: 'search_result' as const,
+			type: "search_result" as const,
 			source: `/entities/${encodeURIComponent(name)}`,
-			title: `${name} (${labels.join(', ')})`,
+			title: `${name} (${labels.join(", ")})`,
 			content: [
 				{
-					type: 'text' as const,
+					type: "text" as const,
 					text: profileText.slice(0, 1500),
 				},
 			],

@@ -1,80 +1,80 @@
 <script lang="ts">
-	import * as Card from '$lib/components/ui/card';
-	import { Button } from '$lib/components/ui/button';
-	import { Plus, Pencil, Trash2 } from '@lucide/svelte';
-	import NoteEditor from './NoteEditor.svelte';
-	import type { InvestigationNote } from '$lib/types';
+import { Button } from "$lib/components/ui/button";
+import * as Card from "$lib/components/ui/card";
+import type { InvestigationNote } from "$lib/types";
+import { Pencil, Plus, Trash2 } from "@lucide/svelte";
+import NoteEditor from "./NoteEditor.svelte";
 
-	interface Props {
-		entityId: string;
-		initialNotes: InvestigationNote[];
+interface Props {
+	entityId: string;
+	initialNotes: InvestigationNote[];
+}
+
+const { entityId, initialNotes }: Props = $props();
+
+let notes = $state<InvestigationNote[]>(initialNotes);
+let isAdding = $state(false);
+let editingId = $state<string | null>(null);
+let deletingId = $state<string | null>(null);
+let saving = $state(false);
+
+async function createNote(content: string) {
+	saving = true;
+	try {
+		const res = await fetch(`/api/entities/${entityId}/notes`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ content }),
+		});
+		if (!res.ok) throw new Error("Failed to create note");
+		const note = (await res.json()) as InvestigationNote;
+		notes = [note, ...notes];
+		isAdding = false;
+	} finally {
+		saving = false;
 	}
+}
 
-	let { entityId, initialNotes }: Props = $props();
-
-	let notes = $state<InvestigationNote[]>(initialNotes);
-	let isAdding = $state(false);
-	let editingId = $state<string | null>(null);
-	let deletingId = $state<string | null>(null);
-	let saving = $state(false);
-
-	async function createNote(content: string) {
-		saving = true;
-		try {
-			const res = await fetch(`/api/entities/${entityId}/notes`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ content }),
-			});
-			if (!res.ok) throw new Error('Failed to create note');
-			const note = (await res.json()) as InvestigationNote;
-			notes = [note, ...notes];
-			isAdding = false;
-		} finally {
-			saving = false;
-		}
+async function updateNote(noteId: string, content: string) {
+	saving = true;
+	try {
+		const res = await fetch(`/api/entities/${entityId}/notes`, {
+			method: "PUT",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ note_id: noteId, content }),
+		});
+		if (!res.ok) throw new Error("Failed to update note");
+		const updated = (await res.json()) as InvestigationNote;
+		notes = notes.map((n) => (n.id === noteId ? updated : n));
+		editingId = null;
+	} finally {
+		saving = false;
 	}
+}
 
-	async function updateNote(noteId: string, content: string) {
-		saving = true;
-		try {
-			const res = await fetch(`/api/entities/${entityId}/notes`, {
-				method: 'PUT',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ note_id: noteId, content }),
-			});
-			if (!res.ok) throw new Error('Failed to update note');
-			const updated = (await res.json()) as InvestigationNote;
-			notes = notes.map((n) => (n.id === noteId ? updated : n));
-			editingId = null;
-		} finally {
-			saving = false;
-		}
+async function deleteNote(noteId: string) {
+	saving = true;
+	try {
+		const res = await fetch(`/api/entities/${entityId}/notes`, {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ note_id: noteId }),
+		});
+		if (!res.ok) throw new Error("Failed to delete note");
+		notes = notes.filter((n) => n.id !== noteId);
+		deletingId = null;
+	} finally {
+		saving = false;
 	}
+}
 
-	async function deleteNote(noteId: string) {
-		saving = true;
-		try {
-			const res = await fetch(`/api/entities/${entityId}/notes`, {
-				method: 'DELETE',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ note_id: noteId }),
-			});
-			if (!res.ok) throw new Error('Failed to delete note');
-			notes = notes.filter((n) => n.id !== noteId);
-			deletingId = null;
-		} finally {
-			saving = false;
-		}
+function formatTimestamp(dateStr: string): string {
+	try {
+		return new Date(dateStr).toLocaleString();
+	} catch {
+		return dateStr;
 	}
-
-	function formatTimestamp(dateStr: string): string {
-		try {
-			return new Date(dateStr).toLocaleString();
-		} catch {
-			return dateStr;
-		}
-	}
+}
 </script>
 
 <div class="space-y-4">

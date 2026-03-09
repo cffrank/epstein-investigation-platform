@@ -1,17 +1,17 @@
 <script lang="ts">
-	import * as Tabs from '$lib/components/ui/tabs';
-	import { Separator } from '$lib/components/ui/separator';
-	import {
-		DossierHeader,
-		DocumentsTab,
-		ConnectionsTab,
-		TimelineTab,
-		BiographyTab,
-		NotesTab,
-	} from '$lib/features/entities/components';
-	import type { PageData } from './$types';
+import { Separator } from "$lib/components/ui/separator";
+import * as Tabs from "$lib/components/ui/tabs";
+import {
+	BiographyTab,
+	ConnectionsTab,
+	DocumentsTab,
+	DossierHeader,
+	NotesTab,
+	TimelineTab,
+} from "$lib/features/entities/components";
+import type { PageData } from "./$types";
 
-	let { data }: { data: PageData } = $props();
+const { data }: { data: PageData } = $props();
 </script>
 
 <div class="container mx-auto p-6 space-y-6">

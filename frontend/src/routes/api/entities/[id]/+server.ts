@@ -1,29 +1,29 @@
-import { json } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
-import { neo4jClient } from '$lib/server/neo4j';
-import { query as dbQuery } from '$lib/server/db';
+import { query as dbQuery } from "$lib/server/db";
+import { neo4jClient } from "$lib/server/neo4j";
 import type {
-	EntityProfile,
-	EntityConnection,
-	EntityCoOccurrence,
 	Document,
-	EntityType
-} from '$lib/types';
+	EntityCoOccurrence,
+	EntityConnection,
+	EntityProfile,
+	EntityType,
+} from "$lib/types";
+import { json } from "@sveltejs/kit";
+import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ params, platform }) => {
 	if (!platform?.env) {
-		return json({ error: 'Platform unavailable in dev mode' }, { status: 500 });
+		return json({ error: "Platform unavailable in dev mode" }, { status: 500 });
 	}
 
 	const { id } = params;
 
 	if (!id || !/^\d+$/.test(id)) {
-		return json({ error: 'Invalid entity ID' }, { status: 400 });
+		return json({ error: "Invalid entity ID" }, { status: 400 });
 	}
 
 	try {
 		const neo4j = neo4jClient(platform);
-		const entityId = parseInt(id, 10);
+		const entityId = Number.parseInt(id, 10);
 
 		// Fetch entity profile with connections
 		const profileCypher = `
@@ -43,24 +43,26 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 		const profileResult = await neo4j.query(profileCypher, { id: entityId });
 
 		if (!profileResult.rows.length) {
-			return json({ error: 'Entity not found' }, { status: 404 });
+			return json({ error: "Entity not found" }, { status: 404 });
 		}
 
 		const [name, type, connectionsRaw] = profileResult.rows[0];
 
 		// Filter out null connections and map to proper type
-		const connections: EntityConnection[] = (connectionsRaw as Array<{
-			id: number;
-			name: string;
-			type: string;
-			rel: string;
-		}>)
+		const connections: EntityConnection[] = (
+			connectionsRaw as Array<{
+				id: number;
+				name: string;
+				type: string;
+				rel: string;
+			}>
+		)
 			.filter((c) => c.id !== null && c.name !== null)
 			.map((c) => ({
 				id: String(c.id),
 				name: c.name,
 				type: c.type as EntityType,
-				relationship_type: c.rel
+				relationship_type: c.rel,
 			}));
 
 		// Fetch documents mentioning this entity
@@ -73,9 +75,7 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 		`;
 
 		const docsResult = await neo4j.query(docsCypher, { id: entityId });
-		const docIds = docsResult.rows
-			.map((row) => row[0] as string)
-			.filter((docId) => docId !== null);
+		const docIds = docsResult.rows.map((row) => row[0] as string).filter((docId) => docId !== null);
 
 		// Fetch document metadata from PostgreSQL
 		let documents: Document[] = [];
@@ -106,7 +106,7 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 				text: null,
 				page_count: null,
 				content_hash: null,
-				created_at: doc.created_at
+				created_at: doc.created_at,
 			}));
 		}
 
@@ -130,7 +130,7 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 			id: String(row[0]),
 			name: row[1] as string,
 			type: row[2] as EntityType,
-			shared_docs: row[3] as number
+			shared_docs: row[3] as number,
 		}));
 
 		const profile: EntityProfile = {
@@ -139,12 +139,12 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 			type: type as EntityType,
 			connections,
 			documents,
-			co_occurrences
+			co_occurrences,
 		};
 
 		return json(profile);
 	} catch (error) {
-		console.error('Entity profile error:', error);
+		console.error("Entity profile error:", error);
 		return json({ error: String(error) }, { status: 500 });
 	}
 };

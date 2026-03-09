@@ -1,21 +1,21 @@
-import { json } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
-import { query as dbQuery } from '$lib/server/db';
-import type { EntityRef, EntityType } from '$lib/types';
-import { validateSearchQuery } from '@epstein/shared';
+import { query as dbQuery } from "$lib/server/db";
+import type { EntityRef, EntityType } from "$lib/types";
+import { validateSearchQuery } from "@epstein/shared";
+import { json } from "@sveltejs/kit";
+import type { RequestHandler } from "./$types";
 
 const ENTITY_TYPE_MAP: Record<string, EntityType> = {
-	person: 'Person',
-	organization: 'Organization',
-	location: 'Location'
+	person: "Person",
+	organization: "Organization",
+	location: "Location",
 };
 
 export const GET: RequestHandler = async ({ url, platform }) => {
 	if (!platform?.env) {
-		return json({ error: 'Platform unavailable in dev mode' }, { status: 500 });
+		return json({ error: "Platform unavailable in dev mode" }, { status: 500 });
 	}
 
-	const q = url.searchParams.get('q')?.trim();
+	const q = url.searchParams.get("q")?.trim();
 
 	if (!q) {
 		return json([]);
@@ -36,18 +36,18 @@ export const GET: RequestHandler = async ({ url, platform }) => {
 			WHERE canonical_name ILIKE $1 || '%'
 			ORDER BY canonical_name
 			LIMIT 10`,
-			[sanitized]
+			[sanitized],
 		);
 
 		const results: EntityRef[] = rows.map((row) => ({
 			id: row.id,
 			name: row.name,
-			type: ENTITY_TYPE_MAP[row.type.toLowerCase()] ?? 'Person'
+			type: ENTITY_TYPE_MAP[row.type.toLowerCase()] ?? "Person",
 		}));
 
 		return json(results);
 	} catch (error) {
-		console.error('Entity autocomplete error:', error);
+		console.error("Entity autocomplete error:", error);
 		return json({ error: String(error) }, { status: 500 });
 	}
 };

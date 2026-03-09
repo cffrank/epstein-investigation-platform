@@ -1,18 +1,18 @@
 {
-  "name": "epstein-api-backend",
-  "version": "1.0.0",
-  "type": "module",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
-  "dependencies": {
-    "hono": "^4.0.0",
-    "@hono/node-server": "^1.8.0",
-    "pg": "^8.11.0",
-    "@qdrant/js-client-rest": "~1.9.0",
-    "neo4j-driver": "^5.17.0",
-    "pdf-parse": "^1.1.1",
-    "@aws-sdk/client-s3": "^3.500.0"
-  }
+	"name": "epstein-api-backend",
+	"version": "1.0.0",
+	"type": "module",
+	"main": "index.js",
+	"scripts": {
+		"start": "node index.js"
+	},
+	"dependencies": {
+		"hono": "^4.0.0",
+		"@hono/node-server": "^1.8.0",
+		"pg": "^8.11.0",
+		"@qdrant/js-client-rest": "~1.9.0",
+		"neo4j-driver": "^5.17.0",
+		"pdf-parse": "^1.1.1",
+		"@aws-sdk/client-s3": "^3.500.0"
+	}
 }

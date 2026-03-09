@@ -1,18 +1,18 @@
-import { query as dbQuery } from '$lib/server/db';
-import { qdrantClient } from '$lib/server/qdrant';
-import type { SearchResult, SearchFilters, EntityRef, EntityType } from '$lib/types';
+import { query as dbQuery } from "$lib/server/db";
+import { qdrantClient } from "$lib/server/qdrant";
+import type { EntityRef, EntityType, SearchFilters, SearchResult } from "$lib/types";
 
 const ENTITY_TYPE_MAP: Record<string, EntityType> = {
-	person: 'Person',
-	organization: 'Organization',
-	location: 'Location'
+	person: "Person",
+	organization: "Organization",
+	location: "Location",
 };
 
 function applyFilters(
 	conditions: string[],
 	params: unknown[],
 	filters: SearchFilters,
-	startIndex: number
+	startIndex: number,
 ): number {
 	let paramIndex = startIndex;
 
@@ -62,13 +62,13 @@ export async function fulltextSearch(
 	searchQuery: string,
 	filters: SearchFilters,
 	limit: number,
-	offset: number
+	offset: number,
 ) {
 	const conditions: string[] = ["search_vector @@ plainto_tsquery('english', $1)"];
 	const params: unknown[] = [searchQuery];
-	let paramIndex = applyFilters(conditions, params, filters, 2);
+	const paramIndex = applyFilters(conditions, params, filters, 2);
 
-	const whereClause = conditions.join(' AND ');
+	const whereClause = conditions.join(" AND ");
 
 	// Capped count: LIMIT 10001 avoids scanning all 961K rows for pagination
 	// Frontend displays "10,000+" when count equals 10001
@@ -110,20 +110,20 @@ export async function fulltextSearch(
 			created_at: string;
 			rank: number;
 			snippet: string;
-		}>(platform, searchSql, params)
+		}>(platform, searchSql, params),
 	]);
 
-	const total = parseInt(countResult[0]?.count || '0', 10);
+	const total = Number.parseInt(countResult[0]?.count || "0", 10);
 
 	const results: SearchResult[] = searchResults.map((row) => ({
 		id: row.id,
 		filename: row.filename,
 		source: row.source,
 		doc_type: row.doc_type,
-		snippet: row.snippet || '',
+		snippet: row.snippet || "",
 		score: row.rank,
 		date: row.created_at,
-		entities: []
+		entities: [],
 	}));
 
 	return { results, total };
@@ -134,20 +134,20 @@ export async function semanticSearch(
 	searchQuery: string,
 	filters: SearchFilters,
 	limit: number,
-	offset: number
+	offset: number,
 ) {
 	// Generate embedding via OpenAI
-	const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-		method: 'POST',
+	const embeddingResponse = await fetch("https://api.openai.com/v1/embeddings", {
+		method: "POST",
 		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${(platform.env as { OPENAI_API_KEY: string }).OPENAI_API_KEY}`
+			"Content-Type": "application/json",
+			Authorization: `Bearer ${(platform.env as { OPENAI_API_KEY: string }).OPENAI_API_KEY}`,
 		},
 		body: JSON.stringify({
-			model: 'text-embedding-3-small',
+			model: "text-embedding-3-small",
 			input: searchQuery,
-			dimensions: 1536
-		})
+			dimensions: 1536,
+		}),
 	});
 
 	if (!embeddingResponse.ok) {
@@ -164,7 +164,7 @@ export async function semanticSearch(
 	const qdrantLimit = filters.entityIds?.length ? (limit + offset) * 3 : limit + offset;
 	const searchResults = await qdrant.search(embedding, {
 		limit: qdrantLimit,
-		with_payload: true
+		with_payload: true,
 	});
 
 	// Extract doc IDs and fetch metadata from PostgreSQL
@@ -176,7 +176,7 @@ export async function semanticSearch(
 		return { results: [], total: searchResults.length };
 	}
 
-	const conditions: string[] = ['id = ANY($1)'];
+	const conditions: string[] = ["id = ANY($1)"];
 	const params: unknown[] = [docIds];
 	applyFilters(conditions, params, filters, 2);
 
@@ -189,7 +189,7 @@ export async function semanticSearch(
 			created_at,
 			COALESCE(metadata->>'text', '') as text
 		FROM documents
-		WHERE ${conditions.join(' AND ')}
+		WHERE ${conditions.join(" AND ")}
 	`;
 
 	const docs = await dbQuery<{
@@ -204,7 +204,7 @@ export async function semanticSearch(
 	// Create a map for quick lookup
 	const docMap = new Map(docs.map((d) => [d.id, d]));
 	const scoreMap = new Map(
-		searchResults.map((r) => [r.payload.document_id || r.payload.doc_id, r.score])
+		searchResults.map((r) => [r.payload.document_id || r.payload.doc_id, r.score]),
 	);
 
 	const results: SearchResult[] = docIds
@@ -213,7 +213,7 @@ export async function semanticSearch(
 			if (!doc) return null;
 
 			const score = scoreMap.get(docId) || 0;
-			const snippet = doc.text.slice(0, 300) + (doc.text.length > 300 ? '...' : '');
+			const snippet = doc.text.slice(0, 300) + (doc.text.length > 300 ? "..." : "");
 
 			return {
 				id: doc.id,
@@ -223,7 +223,7 @@ export async function semanticSearch(
 				snippet,
 				score,
 				date: doc.created_at,
-				entities: []
+				entities: [],
 			};
 		})
 		.filter((r): r is SearchResult => r !== null);
@@ -236,12 +236,12 @@ export async function hybridSearch(
 	searchQuery: string,
 	filters: SearchFilters,
 	limit: number,
-	offset: number
+	offset: number,
 ) {
 	// Run both searches in parallel
 	const [fulltext, semantic] = await Promise.all([
 		fulltextSearch(platform, searchQuery, filters, limit * 2, 0),
-		semanticSearch(platform, searchQuery, filters, limit * 2, 0)
+		semanticSearch(platform, searchQuery, filters, limit * 2, 0),
 	]);
 
 	// Reciprocal Rank Fusion (RRF) with k=60
@@ -271,7 +271,7 @@ export async function hybridSearch(
 		.sort((a, b) => b.rrfScore - a.rrfScore)
 		.map((item) => ({
 			...item.doc,
-			score: item.rrfScore
+			score: item.rrfScore,
 		}));
 
 	// Apply pagination
@@ -287,7 +287,7 @@ export async function hybridSearch(
  */
 export async function populateEntities(
 	platform: App.Platform,
-	results: SearchResult[]
+	results: SearchResult[],
 ): Promise<SearchResult[]> {
 	const docIds = results.map((r) => r.id);
 
@@ -303,7 +303,7 @@ export async function populateEntities(
 		JOIN entities e ON e.id = de.entity_id
 		WHERE de.document_id = ANY($1)
 		ORDER BY de.mention_count DESC`,
-		[docIds]
+		[docIds],
 	);
 
 	// Group entities by document_id
@@ -313,13 +313,13 @@ export async function populateEntities(
 		refs.push({
 			id: row.id,
 			name: row.name,
-			type: ENTITY_TYPE_MAP[row.type.toLowerCase()] ?? 'Person'
+			type: ENTITY_TYPE_MAP[row.type.toLowerCase()] ?? "Person",
 		});
 		entityMap.set(row.document_id, refs);
 	}
 
 	return results.map((r) => ({
 		...r,
-		entities: entityMap.get(r.id) ?? []
+		entities: entityMap.get(r.id) ?? [],
 	}));
 }

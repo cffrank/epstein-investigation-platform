@@ -1,30 +1,30 @@
 <script lang="ts">
-	import type { ToolCall } from '$lib/types';
-	import { cn } from '$lib/utils';
+import type { ToolCall } from "$lib/types";
+import { cn } from "$lib/utils";
 
-	interface Props {
-		toolCalls: ToolCall[];
-	}
+interface Props {
+	toolCalls: ToolCall[];
+}
 
-	let { toolCalls }: Props = $props();
-	let expanded = $state(false);
+const { toolCalls }: Props = $props();
+const expanded = $state(false);
 
-	const toolLabels: Record<string, string> = {
-		search_documents: 'Searching documents',
-		semantic_search: 'Semantic search',
-		get_entity_profile: 'Looking up entity',
-		graph_query: 'Querying graph',
-		find_connections: 'Finding connections',
-	};
+const toolLabels: Record<string, string> = {
+	search_documents: "Searching documents",
+	semantic_search: "Semantic search",
+	get_entity_profile: "Looking up entity",
+	graph_query: "Querying graph",
+	find_connections: "Finding connections",
+};
 
-	function summaryText(tc: ToolCall): string {
-		const label = toolLabels[tc.name] || tc.name;
-		if (tc.status === 'running') return `${label}...`;
-		if (tc.status === 'error') return `${label} — failed`;
-		return `${label} — ${tc.resultCount ?? 0} results`;
-	}
+function summaryText(tc: ToolCall): string {
+	const label = toolLabels[tc.name] || tc.name;
+	if (tc.status === "running") return `${label}...`;
+	if (tc.status === "error") return `${label} — failed`;
+	return `${label} — ${tc.resultCount ?? 0} results`;
+}
 
-	const allComplete = $derived(toolCalls.every((tc) => tc.status !== 'running'));
+const allComplete = $derived(toolCalls.every((tc) => tc.status !== "running"));
 </script>
 
 {#if toolCalls.length > 0}

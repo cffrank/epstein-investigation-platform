@@ -1,15 +1,10 @@
-import { json } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
-import type { SearchResult, SearchMode, SearchFilters } from '$lib/types';
-import { validateSearchQuery } from '@epstein/shared';
-import {
-	fulltextSearch,
-	semanticSearch,
-	hybridSearch,
-	populateEntities
-} from '$lib/server/search';
+import { fulltextSearch, hybridSearch, populateEntities, semanticSearch } from "$lib/server/search";
+import type { SearchFilters, SearchMode, SearchResult } from "$lib/types";
+import { validateSearchQuery } from "@epstein/shared";
+import { json } from "@sveltejs/kit";
+import type { RequestHandler } from "./$types";
 
-type ExportFormat = 'csv' | 'json';
+type ExportFormat = "csv" | "json";
 
 interface ExportRequest {
 	query: string;
@@ -22,22 +17,22 @@ interface ExportRequest {
 const EXPORT_LIMITS: Record<SearchMode, number> = {
 	fulltext: 5000,
 	hybrid: 5000,
-	semantic: 1000
+	semantic: 1000,
 };
 
 export const POST: RequestHandler = async ({ request, platform }) => {
 	if (!platform?.env) {
-		return json({ error: 'Platform unavailable in dev mode' }, { status: 500 });
+		return json({ error: "Platform unavailable in dev mode" }, { status: 500 });
 	}
 
 	const body = (await request.json()) as ExportRequest;
 	const { query: rawQuery, filters = {}, mode, format } = body;
 
 	if (!rawQuery?.trim()) {
-		return json({ error: 'Query is required' }, { status: 400 });
+		return json({ error: "Query is required" }, { status: 400 });
 	}
 
-	if (!format || (format !== 'csv' && format !== 'json')) {
+	if (!format || (format !== "csv" && format !== "json")) {
 		return json({ error: 'Format must be "csv" or "json"' }, { status: 400 });
 	}
 
@@ -51,13 +46,13 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	try {
 		let results: SearchResult[] = [];
 
-		if (mode === 'fulltext') {
+		if (mode === "fulltext") {
 			const data = await fulltextSearch(platform, searchQuery, filters, limit, 0);
 			results = data.results;
-		} else if (mode === 'semantic') {
+		} else if (mode === "semantic") {
 			const data = await semanticSearch(platform, searchQuery, filters, limit, 0);
 			results = data.results;
-		} else if (mode === 'hybrid') {
+		} else if (mode === "hybrid") {
 			const data = await hybridSearch(platform, searchQuery, filters, limit, 0);
 			results = data.results;
 		}
@@ -67,16 +62,16 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 			results = await populateEntities(platform, results);
 		}
 
-		const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+		const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
 		const filename = `search-export-${timestamp}`;
 
-		if (format === 'json') {
+		if (format === "json") {
 			return new Response(JSON.stringify(results, null, 2), {
 				status: 200,
 				headers: {
-					'Content-Type': 'application/json',
-					'Content-Disposition': `attachment; filename="${filename}.json"`
-				}
+					"Content-Type": "application/json",
+					"Content-Disposition": `attachment; filename="${filename}.json"`,
+				},
 			});
 		}
 
@@ -85,12 +80,12 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		return new Response(csv, {
 			status: 200,
 			headers: {
-				'Content-Type': 'text/csv; charset=utf-8',
-				'Content-Disposition': `attachment; filename="${filename}.csv"`
-			}
+				"Content-Type": "text/csv; charset=utf-8",
+				"Content-Disposition": `attachment; filename="${filename}.csv"`,
+			},
 		});
 	} catch (error) {
-		console.error('Export error:', error);
+		console.error("Export error:", error);
 		return json({ error: String(error) }, { status: 500 });
 	}
 };
@@ -99,23 +94,23 @@ export const POST: RequestHandler = async ({ request, platform }) => {
  * Convert search results to RFC 4180 CSV with UTF-8 BOM for Excel compatibility.
  */
 function resultsToCSV(results: SearchResult[]): string {
-	const BOM = '\uFEFF';
-	const headers = ['filename', 'source', 'doc_type', 'date', 'score', 'snippet', 'entities'];
+	const BOM = "\uFEFF";
+	const headers = ["filename", "source", "doc_type", "date", "score", "snippet", "entities"];
 	const rows = results.map((r) => {
-		const entityNames = r.entities.map((e) => e.name).join('; ');
+		const entityNames = r.entities.map((e) => e.name).join("; ");
 		const snippet = stripHtmlTags(r.snippet);
 		return [
 			escapeCSV(r.filename),
 			escapeCSV(r.source),
-			escapeCSV(r.doc_type ?? ''),
-			escapeCSV(r.date ?? ''),
+			escapeCSV(r.doc_type ?? ""),
+			escapeCSV(r.date ?? ""),
 			String(r.score),
 			escapeCSV(snippet),
-			escapeCSV(entityNames)
-		].join(',');
+			escapeCSV(entityNames),
+		].join(",");
 	});
 
-	return BOM + headers.join(',') + '\n' + rows.join('\n');
+	return `${BOM + headers.join(",")}\n${rows.join("\n")}`;
 }
 
 /**
@@ -124,8 +119,8 @@ function resultsToCSV(results: SearchResult[]): string {
  * Double any internal quotes.
  */
 function escapeCSV(field: string): string {
-	if (field.includes(',') || field.includes('"') || field.includes('\n') || field.includes('\r')) {
-		return '"' + field.replace(/"/g, '""') + '"';
+	if (field.includes(",") || field.includes('"') || field.includes("\n") || field.includes("\r")) {
+		return `"${field.replace(/"/g, '""')}"`;
 	}
 	return field;
 }
@@ -134,5 +129,5 @@ function escapeCSV(field: string): string {
  * Strip HTML tags from snippet text (e.g., <mark> tags from ts_headline).
  */
 function stripHtmlTags(html: string): string {
-	return html.replace(/<[^>]*>/g, '');
+	return html.replace(/<[^>]*>/g, "");
 }

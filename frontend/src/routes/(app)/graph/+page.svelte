@@ -1,64 +1,64 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import GraphCanvas from '$lib/features/graph/components/GraphCanvas.svelte';
-	import GraphControls from '$lib/features/graph/components/GraphControls.svelte';
-	import GraphSearch from '$lib/features/graph/components/GraphSearch.svelte';
-	import AnalysisSidebar from '$lib/features/graph/components/AnalysisSidebar.svelte';
-	import GraphLegend from '$lib/features/graph/components/GraphLegend.svelte';
-	import * as graphStore from '$lib/features/graph/stores.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import { entityColor } from '$lib/utils';
-	import { ExternalLink, X } from '@lucide/svelte';
+import { Badge } from "$lib/components/ui/badge";
+import { Button } from "$lib/components/ui/button";
+import AnalysisSidebar from "$lib/features/graph/components/AnalysisSidebar.svelte";
+import type GraphCanvas from "$lib/features/graph/components/GraphCanvas.svelte";
+import GraphControls from "$lib/features/graph/components/GraphControls.svelte";
+import GraphLegend from "$lib/features/graph/components/GraphLegend.svelte";
+import GraphSearch from "$lib/features/graph/components/GraphSearch.svelte";
+import * as graphStore from "$lib/features/graph/stores.svelte";
+import { entityColor } from "$lib/utils";
+import { ExternalLink, X } from "@lucide/svelte";
+import { onMount } from "svelte";
 
-	let canvasRef: GraphCanvas | null = null;
+const canvasRef: GraphCanvas | null = null;
 
-	let elements = $derived(graphStore.getElements());
-	let selectedNode = $derived(graphStore.getSelectedNode());
-	let loading = $derived(graphStore.getLoading());
-	let error = $derived(graphStore.getError());
-	let stats = $derived(graphStore.getStats());
-	let colorMode = $derived(graphStore.getColorMode());
-	let communitySizes = $derived(graphStore.getCommunitySizes());
+const elements = $derived(graphStore.getElements());
+const selectedNode = $derived(graphStore.getSelectedNode());
+const loading = $derived(graphStore.getLoading());
+const error = $derived(graphStore.getError());
+const stats = $derived(graphStore.getStats());
+const colorMode = $derived(graphStore.getColorMode());
+const communitySizes = $derived(graphStore.getCommunitySizes());
 
-	// Get selected node details from elements
-	let selectedNodeData = $derived.by(() => {
-		if (!selectedNode) return null;
-		const el = elements.find((e) => e.data.id === selectedNode && !('source' in e.data));
-		return el ? el.data : null;
-	});
+// Get selected node details from elements
+const selectedNodeData = $derived.by(() => {
+	if (!selectedNode) return null;
+	const el = elements.find((e) => e.data.id === selectedNode && !("source" in e.data));
+	return el ? el.data : null;
+});
 
-	function handleSearch(query: string) {
-		graphStore.searchEntities(query);
-	}
+function handleSearch(query: string) {
+	graphStore.searchEntities(query);
+}
 
-	function handleNodeTap(nodeId: string) {
-		graphStore.selectNode(nodeId);
-		graphStore.expandNode(nodeId);
-	}
+function handleNodeTap(nodeId: string) {
+	graphStore.selectNode(nodeId);
+	graphStore.expandNode(nodeId);
+}
 
-	function handleFit() {
-		canvasRef?.fit();
-	}
+function handleFit() {
+	canvasRef?.fit();
+}
 
-	function handleZoomIn() {
-		canvasRef?.zoomIn();
-	}
+function handleZoomIn() {
+	canvasRef?.zoomIn();
+}
 
-	function handleZoomOut() {
-		canvasRef?.zoomOut();
-	}
+function handleZoomOut() {
+	canvasRef?.zoomOut();
+}
 
-	function handleReset() {
+function handleReset() {
+	graphStore.resetGraph();
+	canvasRef?.reset();
+}
+
+onMount(() => {
+	return () => {
 		graphStore.resetGraph();
-		canvasRef?.reset();
-	}
-
-	onMount(() => {
-		return () => {
-			graphStore.resetGraph();
-		};
-	});
+	};
+});
 </script>
 
 <div class="flex h-[calc(100vh-0px)] w-full overflow-hidden">

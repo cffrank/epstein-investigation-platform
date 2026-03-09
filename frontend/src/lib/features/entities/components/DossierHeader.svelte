@@ -1,28 +1,26 @@
 <script lang="ts">
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import { Separator } from '$lib/components/ui/separator';
-	import { entityColor } from '$lib/utils';
-	import { MessageSquare } from '@lucide/svelte';
-	import type { EntityType } from '$lib/types';
+import { Badge } from "$lib/components/ui/badge";
+import { Button } from "$lib/components/ui/button";
+import { Separator } from "$lib/components/ui/separator";
+import type { EntityType } from "$lib/types";
+import { entityColor } from "$lib/utils";
+import { MessageSquare } from "@lucide/svelte";
 
-	interface Props {
-		name: string;
-		type: EntityType;
-		aliases: string[];
-		documentCount: number;
-		connectionCount: number;
-	}
+interface Props {
+	name: string;
+	type: EntityType;
+	aliases: string[];
+	documentCount: number;
+	connectionCount: number;
+}
 
-	let { name, type, aliases, documentCount, connectionCount }: Props = $props();
+const { name, type, aliases, documentCount, connectionCount }: Props = $props();
 
-	let showAllAliases = $state(false);
-	const MAX_VISIBLE_ALIASES = 3;
+const showAllAliases = $state(false);
+const MAX_VISIBLE_ALIASES = 3;
 
-	const visibleAliases = $derived(
-		showAllAliases ? aliases : aliases.slice(0, MAX_VISIBLE_ALIASES)
-	);
-	const hiddenCount = $derived(Math.max(0, aliases.length - MAX_VISIBLE_ALIASES));
+const visibleAliases = $derived(showAllAliases ? aliases : aliases.slice(0, MAX_VISIBLE_ALIASES));
+const hiddenCount = $derived(Math.max(0, aliases.length - MAX_VISIBLE_ALIASES));
 </script>
 
 <div class="space-y-4">

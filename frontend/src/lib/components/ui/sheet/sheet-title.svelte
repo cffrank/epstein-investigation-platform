@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { Dialog as SheetPrimitive } from "bits-ui";
-	import { cn } from "$lib/utils";
+import { cn } from "$lib/utils";
+import type { Dialog as SheetPrimitive } from "bits-ui";
 
-	let {
-		ref = $bindable(null),
-		class: className,
-		...restProps
-	}: SheetPrimitive.TitleProps = $props();
+const {
+	ref = $bindable(null),
+	class: className,
+	...restProps
+}: SheetPrimitive.TitleProps = $props();
 </script>
 
 <SheetPrimitive.Title

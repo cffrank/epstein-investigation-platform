@@ -7,19 +7,19 @@ interface QueryResponse<T> {
 export async function query<T = Record<string, unknown>>(
 	platform: App.Platform,
 	sql: string,
-	params?: unknown[]
+	params?: unknown[],
 ): Promise<T[]> {
 	const env = platform.env as { API_BASE_URL: string; API_SECRET_KEY: string };
 	const baseUrl = env.API_BASE_URL;
 	const apiKey = env.API_SECRET_KEY;
 
 	const response = await fetch(`${baseUrl}/mcp/query`, {
-		method: 'POST',
+		method: "POST",
 		headers: {
-			'Content-Type': 'application/json',
-			'X-API-Key': apiKey
+			"Content-Type": "application/json",
+			"X-API-Key": apiKey,
 		},
-		body: JSON.stringify({ sql, params: params || [] })
+		body: JSON.stringify({ sql, params: params || [] }),
 	});
 
 	if (!response.ok) {
@@ -35,7 +35,7 @@ export async function query<T = Record<string, unknown>>(
 export async function queryOne<T = Record<string, unknown>>(
 	platform: App.Platform,
 	sql: string,
-	params?: unknown[]
+	params?: unknown[],
 ): Promise<T | null> {
 	const rows = await query<T>(platform, sql, params);
 	return rows[0] ?? null;

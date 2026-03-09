@@ -1,60 +1,60 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import * as graphStore from '$lib/features/graph/stores.svelte';
-	import {
-		Accordion,
-		AccordionContent,
-		AccordionItem,
-		AccordionTrigger
-	} from '$lib/components/ui/accordion';
-	import { Button } from '$lib/components/ui/button';
-	import { RefreshCw, Loader2 } from '@lucide/svelte';
-	import AlgorithmSection from './AlgorithmSection.svelte';
-	import HiddenConnections from './HiddenConnections.svelte';
+import {
+	Accordion,
+	AccordionContent,
+	AccordionItem,
+	AccordionTrigger,
+} from "$lib/components/ui/accordion";
+import { Button } from "$lib/components/ui/button";
+import * as graphStore from "$lib/features/graph/stores.svelte";
+import { Loader2, RefreshCw } from "@lucide/svelte";
+import { onMount } from "svelte";
+import AlgorithmSection from "./AlgorithmSection.svelte";
+import HiddenConnections from "./HiddenConnections.svelte";
 
-	let status = $derived(graphStore.getAlgorithmStatus());
-	let computing = $derived(graphStore.getComputing());
-	let colorMode = $derived(graphStore.getColorMode());
-	let activeAlgorithm = $derived(graphStore.getActiveAlgorithm());
-	let pagerankResults = $derived(graphStore.getPagerankResults());
-	let communityResults = $derived(graphStore.getCommunityResults());
-	let bridgeResults = $derived(graphStore.getBridgeResults());
-	let hiddenConnections = $derived(graphStore.getHiddenConnections());
+const status = $derived(graphStore.getAlgorithmStatus());
+const computing = $derived(graphStore.getComputing());
+const colorMode = $derived(graphStore.getColorMode());
+const activeAlgorithm = $derived(graphStore.getActiveAlgorithm());
+const pagerankResults = $derived(graphStore.getPagerankResults());
+const communityResults = $derived(graphStore.getCommunityResults());
+const bridgeResults = $derived(graphStore.getBridgeResults());
+const hiddenConnections = $derived(graphStore.getHiddenConnections());
 
-	let accordionValue = $state<string>('');
+const accordionValue = $state<string>("");
 
-	function relativeTime(dateStr: string | null): string {
-		if (!dateStr) return 'Not yet computed';
-		const diff = Date.now() - new Date(dateStr).getTime();
-		const minutes = Math.floor(diff / 60000);
-		if (minutes < 1) return 'Just now';
-		if (minutes < 60) return `${minutes}m ago`;
-		const hours = Math.floor(minutes / 60);
-		if (hours < 24) return `${hours}h ago`;
-		const days = Math.floor(hours / 24);
-		return `${days}d ago`;
+function relativeTime(dateStr: string | null): string {
+	if (!dateStr) return "Not yet computed";
+	const diff = Date.now() - new Date(dateStr).getTime();
+	const minutes = Math.floor(diff / 60000);
+	if (minutes < 1) return "Just now";
+	if (minutes < 60) return `${minutes}m ago`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours}h ago`;
+	const days = Math.floor(hours / 24);
+	return `${days}d ago`;
+}
+
+function handleEntityClick(id: string) {
+	graphStore.selectNode(id);
+	graphStore.expandNode(id);
+}
+
+$effect(() => {
+	if (accordionValue === "pagerank" && pagerankResults.length === 0) {
+		graphStore.loadPageRank();
+	} else if (accordionValue === "communities" && communityResults.length === 0) {
+		graphStore.loadCommunities();
+	} else if (accordionValue === "bridges" && bridgeResults.length === 0) {
+		graphStore.loadBridges();
+	} else if (accordionValue === "hidden-connections" && hiddenConnections.length === 0) {
+		graphStore.loadHiddenConnections();
 	}
+});
 
-	function handleEntityClick(id: string) {
-		graphStore.selectNode(id);
-		graphStore.expandNode(id);
-	}
-
-	$effect(() => {
-		if (accordionValue === 'pagerank' && pagerankResults.length === 0) {
-			graphStore.loadPageRank();
-		} else if (accordionValue === 'communities' && communityResults.length === 0) {
-			graphStore.loadCommunities();
-		} else if (accordionValue === 'bridges' && bridgeResults.length === 0) {
-			graphStore.loadBridges();
-		} else if (accordionValue === 'hidden-connections' && hiddenConnections.length === 0) {
-			graphStore.loadHiddenConnections();
-		}
-	});
-
-	onMount(() => {
-		graphStore.loadAlgorithmStatus();
-	});
+onMount(() => {
+	graphStore.loadAlgorithmStatus();
+});
 </script>
 
 <aside class="flex h-full w-72 shrink-0 flex-col border-r bg-background overflow-y-auto">

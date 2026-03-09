@@ -12,19 +12,7 @@ export const SEARCH_SNIPPET_SANITIZE_CONFIG = {
  * Allows common formatting tags used in markdown-rendered chat responses.
  */
 export const CHAT_CONTENT_SANITIZE_CONFIG = {
-	ALLOWED_TAGS: [
-		"p",
-		"br",
-		"strong",
-		"em",
-		"code",
-		"pre",
-		"ul",
-		"ol",
-		"li",
-		"a",
-		"mark",
-	],
+	ALLOWED_TAGS: ["p", "br", "strong", "em", "code", "pre", "ul", "ol", "li", "a", "mark"],
 	ALLOWED_ATTR: ["href", "class"],
 };
 

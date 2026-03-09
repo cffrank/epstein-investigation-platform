@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import Anthropic from "@anthropic-ai/sdk";
 
 export function createAnthropicClient(platform: App.Platform) {
 	const env = platform.env as {
@@ -14,10 +14,10 @@ export function createAnthropicClient(platform: App.Platform) {
 
 // Valid model IDs for user selection
 export const CLAUDE_MODELS = {
-	'haiku-4.5': 'claude-haiku-4-5-20251001',
-	'sonnet-4.6': 'claude-sonnet-4-6',
-	'opus-4.6': 'claude-opus-4-6',
+	"haiku-4.5": "claude-haiku-4-5-20251001",
+	"sonnet-4.6": "claude-sonnet-4-6",
+	"opus-4.6": "claude-opus-4-6",
 } as const;
 
 export type ModelKey = keyof typeof CLAUDE_MODELS;
-export const DEFAULT_MODEL: ModelKey = 'sonnet-4.6';
+export const DEFAULT_MODEL: ModelKey = "sonnet-4.6";

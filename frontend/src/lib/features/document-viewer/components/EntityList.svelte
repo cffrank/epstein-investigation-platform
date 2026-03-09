@@ -1,37 +1,37 @@
 <script lang="ts">
-	import type { EntityRef } from '$lib/types';
-	import Badge from '$lib/components/ui/badge/badge.svelte';
-	import { cn } from '$lib/utils';
+import Badge from "$lib/components/ui/badge/badge.svelte";
+import type { EntityRef } from "$lib/types";
+import { cn } from "$lib/utils";
 
-	let { entities }: { entities: EntityRef[] } = $props();
+const { entities }: { entities: EntityRef[] } = $props();
 
-	const entityColors = {
-		Person: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-		Organization: 'bg-green-500/20 text-green-400 border-green-500/30',
-		Location: 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+const entityColors = {
+	Person: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+	Organization: "bg-green-500/20 text-green-400 border-green-500/30",
+	Location: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+};
+
+const groupedEntities = $derived.by(() => {
+	const groups: Record<string, EntityRef[]> = {
+		Person: [],
+		Organization: [],
+		Location: [],
 	};
 
-	const groupedEntities = $derived.by(() => {
-		const groups: Record<string, EntityRef[]> = {
-			Person: [],
-			Organization: [],
-			Location: []
-		};
-
-		for (const entity of entities) {
-			if (groups[entity.type]) {
-				groups[entity.type].push(entity);
-			}
+	for (const entity of entities) {
+		if (groups[entity.type]) {
+			groups[entity.type].push(entity);
 		}
+	}
 
-		return groups;
-	});
+	return groups;
+});
 
-	const entityCounts = $derived({
-		Person: groupedEntities.Person.length,
-		Organization: groupedEntities.Organization.length,
-		Location: groupedEntities.Location.length
-	});
+const entityCounts = $derived({
+	Person: groupedEntities.Person.length,
+	Organization: groupedEntities.Organization.length,
+	Location: groupedEntities.Location.length,
+});
 </script>
 
 <div class="flex h-full flex-col overflow-hidden">

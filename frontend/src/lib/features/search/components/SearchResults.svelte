@@ -1,27 +1,27 @@
 <script lang="ts">
-	import type { SearchResult } from '$lib/types';
-	import { Card } from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
-	import { FileText } from '@lucide/svelte';
-	import { truncate, entityColor } from '$lib/utils';
-	import { sanitizeSearchSnippet } from '$lib/utils/sanitize';
+import { Badge } from "$lib/components/ui/badge";
+import { Card } from "$lib/components/ui/card";
+import type { SearchResult } from "$lib/types";
+import { entityColor, truncate } from "$lib/utils";
+import { sanitizeSearchSnippet } from "$lib/utils/sanitize";
+import { FileText } from "@lucide/svelte";
 
-	interface Props {
-		results: SearchResult[];
-		loading?: boolean;
-	}
+interface Props {
+	results: SearchResult[];
+	loading?: boolean;
+}
 
-	let { results, loading = false }: Props = $props();
+const { results, loading = false }: Props = $props();
 
-	function formatDate(dateStr: string | null): string {
-		if (!dateStr) return 'Unknown date';
-		const date = new Date(dateStr);
-		return date.toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
-	}
+function formatDate(dateStr: string | null): string {
+	if (!dateStr) return "Unknown date";
+	const date = new Date(dateStr);
+	return date.toLocaleDateString("en-US", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	});
+}
 </script>
 
 {#if loading}

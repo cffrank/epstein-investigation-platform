@@ -1,26 +1,26 @@
 <script lang="ts">
-	import type { ModelKey } from '$lib/types';
+import type { ModelKey } from "$lib/types";
 
-	interface Props {
-		value: ModelKey;
-		onchange: (model: ModelKey) => void;
-		disabled?: boolean;
-	}
+interface Props {
+	value: ModelKey;
+	onchange: (model: ModelKey) => void;
+	disabled?: boolean;
+}
 
-	let { value, onchange, disabled = false }: Props = $props();
+const { value, onchange, disabled = false }: Props = $props();
 
-	const models: Array<{ key: ModelKey; label: string; hint: string }> = [
-		{ key: 'haiku-4.5', label: 'Haiku 4.5', hint: 'Fast · Simple lookups' },
-		{ key: 'sonnet-4.6', label: 'Sonnet 4.6', hint: 'Fast · Good for most' },
-		{ key: 'opus-4.6', label: 'Opus 4.6', hint: 'Deep analysis · Slower' },
-	];
+const models: Array<{ key: ModelKey; label: string; hint: string }> = [
+	{ key: "haiku-4.5", label: "Haiku 4.5", hint: "Fast · Simple lookups" },
+	{ key: "sonnet-4.6", label: "Sonnet 4.6", hint: "Fast · Good for most" },
+	{ key: "opus-4.6", label: "Opus 4.6", hint: "Deep analysis · Slower" },
+];
 
-	function handleChange(event: Event) {
-		const target = event.target as HTMLSelectElement;
-		onchange(target.value as ModelKey);
-	}
+function handleChange(event: Event) {
+	const target = event.target as HTMLSelectElement;
+	onchange(target.value as ModelKey);
+}
 
-	const currentLabel = $derived(models.find((m) => m.key === value)?.label || value);
+const currentLabel = $derived(models.find((m) => m.key === value)?.label || value);
 </script>
 
 <div class="relative">

@@ -1,15 +1,15 @@
-import type { ChatMessage, NativeCitation, ModelKey } from '$lib/types';
-import { parseSSE } from './sse';
+import type { ChatMessage, ModelKey, NativeCitation } from "$lib/types";
+import { parseSSE } from "./sse";
 
 // Model selection persists in localStorage
 function getStoredModel(): ModelKey {
-	if (typeof window === 'undefined') return 'sonnet-4.6';
-	return (localStorage.getItem('chat-model') as ModelKey) || 'sonnet-4.6';
+	if (typeof window === "undefined") return "sonnet-4.6";
+	return (localStorage.getItem("chat-model") as ModelKey) || "sonnet-4.6";
 }
 
 let messages = $state<ChatMessage[]>([]);
 let isStreaming = $state(false);
-let input = $state('');
+let input = $state("");
 let selectedModel = $state<ModelKey>(getStoredModel());
 
 export const chatStore = {
@@ -30,32 +30,32 @@ export const chatStore = {
 	},
 	set selectedModel(value: ModelKey) {
 		selectedModel = value;
-		if (typeof window !== 'undefined') localStorage.setItem('chat-model', value);
+		if (typeof window !== "undefined") localStorage.setItem("chat-model", value);
 	},
 
 	async sendMessage(content: string) {
 		if (!content.trim() || isStreaming) return;
 
-		const userMessage: ChatMessage = { role: 'user', content: content.trim() };
+		const userMessage: ChatMessage = { role: "user", content: content.trim() };
 		messages.push(userMessage);
-		input = '';
+		input = "";
 		isStreaming = true;
 
 		const assistantMessage: ChatMessage = {
-			role: 'assistant',
-			content: '',
+			role: "assistant",
+			content: "",
 			toolCalls: [],
 			citations: [],
 		};
 		messages.push(assistantMessage);
 
 		try {
-			const response = await fetch('/api/chat', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+			const response = await fetch("/api/chat", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					messages: messages
-						.filter((m) => m.role === 'user' || m.role === 'assistant')
+						.filter((m) => m.role === "user" || m.role === "assistant")
 						.map((m) => ({ role: m.role, content: m.content })),
 					model: selectedModel,
 				}),
@@ -66,12 +66,12 @@ export const chatStore = {
 			}
 
 			if (!response.body) {
-				throw new Error('No response body');
+				throw new Error("No response body");
 			}
 
 			for await (const event of parseSSE(response.body)) {
 				switch (event.event) {
-					case 'tool_call': {
+					case "tool_call": {
 						const data = JSON.parse(event.data) as {
 							id: string;
 							name: string;
@@ -83,13 +83,13 @@ export const chatStore = {
 								id: data.id,
 								name: data.name,
 								input: data.input,
-								status: 'running' as const,
+								status: "running" as const,
 							},
 						];
 						messages = [...messages];
 						break;
 					}
-					case 'tool_result': {
+					case "tool_result": {
 						const data = JSON.parse(event.data) as {
 							id: string;
 							status: string;
@@ -97,38 +97,35 @@ export const chatStore = {
 						};
 						const tc = assistantMessage.toolCalls?.find((t) => t.id === data.id);
 						if (tc) {
-							tc.status = (data.status as 'complete' | 'error') || 'complete';
+							tc.status = (data.status as "complete" | "error") || "complete";
 							tc.resultCount = data.resultCount;
 						}
 						messages = [...messages];
 						break;
 					}
-					case 'text_delta': {
+					case "text_delta": {
 						const data = JSON.parse(event.data) as { text: string };
 						assistantMessage.content += data.text;
 						messages = [...messages];
 						break;
 					}
-					case 'citations_delta': {
+					case "citations_delta": {
 						const data = JSON.parse(event.data) as { citation: NativeCitation };
-						assistantMessage.citations = [
-							...(assistantMessage.citations || []),
-							data.citation,
-						];
+						assistantMessage.citations = [...(assistantMessage.citations || []), data.citation];
 						messages = [...messages];
 						break;
 					}
-					case 'error': {
+					case "error": {
 						const data = JSON.parse(event.data) as { message: string };
 						assistantMessage.content += `\n\n[Error: ${data.message}]`;
 						messages = [...messages];
 						break;
 					}
-					case 'done':
+					case "done":
 						break;
 					default:
 						// Handle legacy 'delta' events for backward compat
-						if (event.event === 'delta') {
+						if (event.event === "delta") {
 							const data = JSON.parse(event.data) as { content?: string };
 							if (data.content) assistantMessage.content += data.content;
 							messages = [...messages];
@@ -136,10 +133,9 @@ export const chatStore = {
 				}
 			}
 		} catch (error) {
-			console.error('Chat error:', error);
+			console.error("Chat error:", error);
 			assistantMessage.content =
-				assistantMessage.content ||
-				'Sorry, an error occurred while processing your request.';
+				assistantMessage.content || "Sorry, an error occurred while processing your request.";
 			messages = [...messages];
 		} finally {
 			isStreaming = false;
@@ -148,6 +144,6 @@ export const chatStore = {
 
 	clearChat() {
 		messages = [];
-		input = '';
+		input = "";
 	},
 };

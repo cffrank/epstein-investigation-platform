@@ -1,183 +1,187 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
-	import { Input } from '$lib/components/ui/input';
-	import { Button } from '$lib/components/ui/button';
-	import { Tabs, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-	import { searchStore } from '$lib/features/search/stores.svelte';
-	import SearchResults from '$lib/features/search/components/SearchResults.svelte';
-	import Pagination from '$lib/features/search/components/Pagination.svelte';
-	import FilterSidebar from '$lib/features/filters/components/FilterSidebar.svelte';
-	import ExportButton from '$lib/features/search/components/ExportButton.svelte';
-	import { saveSavedSearch } from '$lib/features/search/saved-searches';
-	import { Search, Bookmark, Check, X } from '@lucide/svelte';
-	import type { SearchMode, SearchFilters, SavedSearch } from '$lib/types';
+import { goto } from "$app/navigation";
+import { page } from "$app/stores";
+import { Button } from "$lib/components/ui/button";
+import { Input } from "$lib/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "$lib/components/ui/tabs";
+import FilterSidebar from "$lib/features/filters/components/FilterSidebar.svelte";
+import ExportButton from "$lib/features/search/components/ExportButton.svelte";
+import Pagination from "$lib/features/search/components/Pagination.svelte";
+import SearchResults from "$lib/features/search/components/SearchResults.svelte";
+import { saveSavedSearch } from "$lib/features/search/saved-searches";
+import { searchStore } from "$lib/features/search/stores.svelte";
+import type { SavedSearch, SearchFilters, SearchMode } from "$lib/types";
+import { Bookmark, Check, Search, X } from "@lucide/svelte";
+import { onMount } from "svelte";
 
-	let searchInput = $state('');
-	let showSaveInput = $state(false);
-	let saveNameInput = $state('');
-	let saveSuccess = $state(false);
-	let savedSearchRefreshKey = $state(0);
-	let activeSavedSearch = $state<SavedSearch | null>(null);
+let searchInput = $state("");
+let showSaveInput = $state(false);
+let saveNameInput = $state("");
+let saveSuccess = $state(false);
+let savedSearchRefreshKey = $state(0);
+let activeSavedSearch = $state<SavedSearch | null>(null);
 
-	// Initialize from URL params
-	onMount(() => {
-		const urlParams = new URLSearchParams($page.url.search);
-		const q = urlParams.get('q') || '';
-		const mode = (urlParams.get('mode') as SearchMode) || 'hybrid';
-		const pageNum = parseInt(urlParams.get('page') || '1', 10);
+// Initialize from URL params
+onMount(() => {
+	const urlParams = new URLSearchParams($page.url.search);
+	const q = urlParams.get("q") || "";
+	const mode = (urlParams.get("mode") as SearchMode) || "hybrid";
+	const pageNum = Number.parseInt(urlParams.get("page") || "1", 10);
 
-		searchStore.setQuery(q);
-		searchStore.setMode(mode);
-		searchStore.setPage(pageNum);
-		searchInput = q;
+	searchStore.setQuery(q);
+	searchStore.setMode(mode);
+	searchStore.setPage(pageNum);
+	searchInput = q;
 
-		if (q) {
-			searchStore.performSearch();
-		}
-	});
-
-	// Sync state to URL
-	function updateURL() {
-		const params = new URLSearchParams();
-		if (searchStore.query) params.set('q', searchStore.query);
-		params.set('mode', searchStore.mode);
-		params.set('page', searchStore.page.toString());
-
-		goto(`?${params.toString()}`, { replaceState: true, noScroll: true });
+	if (q) {
+		searchStore.performSearch();
 	}
+});
 
-	async function handleSearch() {
-		searchStore.setQuery(searchInput);
-		activeSavedSearch = null;
+// Sync state to URL
+function updateURL() {
+	const params = new URLSearchParams();
+	if (searchStore.query) params.set("q", searchStore.query);
+	params.set("mode", searchStore.mode);
+	params.set("page", searchStore.page.toString());
+
+	goto(`?${params.toString()}`, { replaceState: true, noScroll: true });
+}
+
+async function handleSearch() {
+	searchStore.setQuery(searchInput);
+	activeSavedSearch = null;
+	await searchStore.performSearch();
+	updateURL();
+}
+
+async function handleModeChange(mode: SearchMode) {
+	searchStore.setMode(mode);
+	if (searchStore.query) {
 		await searchStore.performSearch();
 		updateURL();
 	}
+}
 
-	async function handleModeChange(mode: SearchMode) {
-		searchStore.setMode(mode);
-		if (searchStore.query) {
-			await searchStore.performSearch();
-			updateURL();
-		}
-	}
+async function handlePageChange(pageNum: number) {
+	searchStore.setPage(pageNum);
+	await searchStore.performSearch();
+	updateURL();
+}
 
-	async function handlePageChange(pageNum: number) {
-		searchStore.setPage(pageNum);
+async function handleFilterChange(filters: SearchFilters) {
+	searchStore.setFilters(filters);
+	if (searchStore.query) {
 		await searchStore.performSearch();
 		updateURL();
 	}
+}
 
-	async function handleFilterChange(filters: SearchFilters) {
-		searchStore.setFilters(filters);
-		if (searchStore.query) {
-			await searchStore.performSearch();
-			updateURL();
-		}
-	}
-
-	async function handleEntityAdd(entity: import('$lib/types').EntityRef) {
-		searchStore.addEntityFilter(entity);
-		if (searchStore.query) {
-			await searchStore.performSearch();
-			updateURL();
-		}
-	}
-
-	async function handleEntityRemove(entityId: string) {
-		searchStore.removeEntityFilter(entityId);
-		if (searchStore.query) {
-			await searchStore.performSearch();
-			updateURL();
-		}
-	}
-
-	async function handleLoadSavedSearch(saved: SavedSearch) {
-		searchStore.setQuery(saved.query);
-		searchStore.setMode(saved.mode);
-		searchStore.selectedEntities = [];
-		searchStore.setFilters(saved.filters);
-		searchInput = saved.query;
-		activeSavedSearch = saved;
+async function handleEntityAdd(entity: import("$lib/types").EntityRef) {
+	searchStore.addEntityFilter(entity);
+	if (searchStore.query) {
 		await searchStore.performSearch();
 		updateURL();
 	}
+}
 
-	function handleSaveSearch() {
-		showSaveInput = true;
-		saveNameInput = searchStore.query.slice(0, 30);
-	}
-
-	function confirmSaveSearch() {
-		if (!saveNameInput.trim()) return;
-
-		const saved: SavedSearch = {
-			id: crypto.randomUUID(),
-			name: saveNameInput.trim(),
-			query: searchStore.query,
-			mode: searchStore.mode,
-			filters: { ...searchStore.filters },
-			createdAt: new Date().toISOString()
-		};
-
-		saveSavedSearch(saved);
-		showSaveInput = false;
-		saveNameInput = '';
-		saveSuccess = true;
-		savedSearchRefreshKey++;
-
-		setTimeout(() => {
-			saveSuccess = false;
-		}, 2000);
-	}
-
-	function cancelSaveSearch() {
-		showSaveInput = false;
-		saveNameInput = '';
-	}
-
-	function clearSavedSearch() {
-		activeSavedSearch = null;
-		searchStore.setQuery('');
-		searchStore.clearEntityFilters();
-		searchStore.setFilters({});
-		searchInput = '';
-		searchStore.results = [];
-		searchStore.total = 0;
+async function handleEntityRemove(entityId: string) {
+	searchStore.removeEntityFilter(entityId);
+	if (searchStore.query) {
+		await searchStore.performSearch();
 		updateURL();
 	}
+}
 
-	function handleKeyPress(event: KeyboardEvent) {
-		if (event.key === 'Enter') {
-			handleSearch();
-		}
-	}
+async function handleLoadSavedSearch(saved: SavedSearch) {
+	searchStore.setQuery(saved.query);
+	searchStore.setMode(saved.mode);
+	searchStore.selectedEntities = [];
+	searchStore.setFilters(saved.filters);
+	searchInput = saved.query;
+	activeSavedSearch = saved;
+	await searchStore.performSearch();
+	updateURL();
+}
 
-	function handleSaveKeyPress(event: KeyboardEvent) {
-		if (event.key === 'Enter') {
-			confirmSaveSearch();
-		} else if (event.key === 'Escape') {
-			cancelSaveSearch();
-		}
-	}
+function handleSaveSearch() {
+	showSaveInput = true;
+	saveNameInput = searchStore.query.slice(0, 30);
+}
 
-	function buildFilterSummary(): string {
-		const parts: string[] = [];
-		if (searchStore.filters.entityIds?.length) {
-			parts.push(`${searchStore.filters.entityIds.length} entity filter${searchStore.filters.entityIds.length > 1 ? 's' : ''}`);
-		}
-		if (searchStore.filters.sources?.length) {
-			parts.push(`${searchStore.filters.sources.length} source${searchStore.filters.sources.length > 1 ? 's' : ''}`);
-		}
-		if (searchStore.filters.classifications?.length) {
-			parts.push(searchStore.filters.classifications.join(', '));
-		}
-		if (searchStore.filters.dateRange) {
-			parts.push(`${searchStore.filters.dateRange[0]} to ${searchStore.filters.dateRange[1]}`);
-		}
-		return parts.length > 0 ? parts.join(', ') : '';
+function confirmSaveSearch() {
+	if (!saveNameInput.trim()) return;
+
+	const saved: SavedSearch = {
+		id: crypto.randomUUID(),
+		name: saveNameInput.trim(),
+		query: searchStore.query,
+		mode: searchStore.mode,
+		filters: { ...searchStore.filters },
+		createdAt: new Date().toISOString(),
+	};
+
+	saveSavedSearch(saved);
+	showSaveInput = false;
+	saveNameInput = "";
+	saveSuccess = true;
+	savedSearchRefreshKey++;
+
+	setTimeout(() => {
+		saveSuccess = false;
+	}, 2000);
+}
+
+function cancelSaveSearch() {
+	showSaveInput = false;
+	saveNameInput = "";
+}
+
+function clearSavedSearch() {
+	activeSavedSearch = null;
+	searchStore.setQuery("");
+	searchStore.clearEntityFilters();
+	searchStore.setFilters({});
+	searchInput = "";
+	searchStore.results = [];
+	searchStore.total = 0;
+	updateURL();
+}
+
+function handleKeyPress(event: KeyboardEvent) {
+	if (event.key === "Enter") {
+		handleSearch();
 	}
+}
+
+function handleSaveKeyPress(event: KeyboardEvent) {
+	if (event.key === "Enter") {
+		confirmSaveSearch();
+	} else if (event.key === "Escape") {
+		cancelSaveSearch();
+	}
+}
+
+function buildFilterSummary(): string {
+	const parts: string[] = [];
+	if (searchStore.filters.entityIds?.length) {
+		parts.push(
+			`${searchStore.filters.entityIds.length} entity filter${searchStore.filters.entityIds.length > 1 ? "s" : ""}`,
+		);
+	}
+	if (searchStore.filters.sources?.length) {
+		parts.push(
+			`${searchStore.filters.sources.length} source${searchStore.filters.sources.length > 1 ? "s" : ""}`,
+		);
+	}
+	if (searchStore.filters.classifications?.length) {
+		parts.push(searchStore.filters.classifications.join(", "));
+	}
+	if (searchStore.filters.dateRange) {
+		parts.push(`${searchStore.filters.dateRange[0]} to ${searchStore.filters.dateRange[1]}`);
+	}
+	return parts.length > 0 ? parts.join(", ") : "";
+}
 </script>
 
 <div class="flex h-full">

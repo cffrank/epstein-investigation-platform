@@ -1,58 +1,58 @@
 <script lang="ts">
-	import type { SearchMode, SearchFilters } from '$lib/types';
-	import { Button } from '$lib/components/ui/button';
-	import { Download } from '@lucide/svelte';
+import { Button } from "$lib/components/ui/button";
+import type { SearchFilters, SearchMode } from "$lib/types";
+import { Download } from "@lucide/svelte";
 
-	interface Props {
-		query: string;
-		mode: SearchMode;
-		filters: SearchFilters;
-		disabled?: boolean;
-	}
+interface Props {
+	query: string;
+	mode: SearchMode;
+	filters: SearchFilters;
+	disabled?: boolean;
+}
 
-	let { query, mode, filters, disabled = false }: Props = $props();
+const { query, mode, filters, disabled = false }: Props = $props();
 
-	let showMenu = $state(false);
-	let exporting = $state(false);
-	let containerEl: HTMLDivElement | undefined = $state();
+let showMenu = $state(false);
+let exporting = $state(false);
+const containerEl: HTMLDivElement | undefined = $state();
 
-	function handleClickOutside(event: MouseEvent) {
-		if (containerEl && !containerEl.contains(event.target as Node)) {
-			showMenu = false;
-		}
-	}
-
-	async function handleExport(format: 'csv' | 'json') {
+function handleClickOutside(event: MouseEvent) {
+	if (containerEl && !containerEl.contains(event.target as Node)) {
 		showMenu = false;
-		exporting = true;
-
-		try {
-			const response = await fetch('/api/search/export', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ query, filters, mode, format })
-			});
-
-			if (!response.ok) throw new Error('Export failed');
-
-			const blob = await response.blob();
-			const ext = format === 'csv' ? 'csv' : 'json';
-			const url = URL.createObjectURL(blob);
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = `search-results.${ext}`;
-			document.body.appendChild(a);
-			a.click();
-			document.body.removeChild(a);
-			URL.revokeObjectURL(url);
-		} catch (err) {
-			console.error('Export error:', err);
-		} finally {
-			exporting = false;
-		}
 	}
+}
 
-	let isDisabled = $derived(disabled || !query.trim() || exporting);
+async function handleExport(format: "csv" | "json") {
+	showMenu = false;
+	exporting = true;
+
+	try {
+		const response = await fetch("/api/search/export", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ query, filters, mode, format }),
+		});
+
+		if (!response.ok) throw new Error("Export failed");
+
+		const blob = await response.blob();
+		const ext = format === "csv" ? "csv" : "json";
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = `search-results.${ext}`;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+	} catch (err) {
+		console.error("Export error:", err);
+	} finally {
+		exporting = false;
+	}
+}
+
+const isDisabled = $derived(disabled || !query.trim() || exporting);
 </script>
 
 <svelte:window onclick={handleClickOutside} />

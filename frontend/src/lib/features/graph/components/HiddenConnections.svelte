@@ -1,29 +1,29 @@
 <script lang="ts">
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import { entityColor } from '$lib/utils';
+import { Badge } from "$lib/components/ui/badge";
+import { Button } from "$lib/components/ui/button";
+import { entityColor } from "$lib/utils";
 
-	interface HiddenConnectionPair {
-		personAId: string;
-		personAName: string;
-		personBId: string;
-		personBName: string;
-		sharedCount: number;
-		topSharedNeighbors: Array<{ id: string; name: string; type: string }>;
-	}
+interface HiddenConnectionPair {
+	personAId: string;
+	personAName: string;
+	personBId: string;
+	personBName: string;
+	sharedCount: number;
+	topSharedNeighbors: Array<{ id: string; name: string; type: string }>;
+}
 
-	interface Props {
-		pairs: HiddenConnectionPair[];
-		onLoadPair: (pair: HiddenConnectionPair) => void;
-	}
+interface Props {
+	pairs: HiddenConnectionPair[];
+	onLoadPair: (pair: HiddenConnectionPair) => void;
+}
 
-	let { pairs, onLoadPair }: Props = $props();
+const { pairs, onLoadPair }: Props = $props();
 
-	let expandedPair = $state<number | null>(null);
+let expandedPair = $state<number | null>(null);
 
-	function togglePair(index: number) {
-		expandedPair = expandedPair === index ? null : index;
-	}
+function togglePair(index: number) {
+	expandedPair = expandedPair === index ? null : index;
+}
 </script>
 
 <div class="space-y-1">

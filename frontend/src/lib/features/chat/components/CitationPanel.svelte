@@ -1,29 +1,29 @@
 <script lang="ts">
-	import type { NativeCitation } from '$lib/types';
-	import { Card } from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
-	import { ChevronDown, ChevronUp } from '@lucide/svelte';
+import { Badge } from "$lib/components/ui/badge";
+import { Card } from "$lib/components/ui/card";
+import type { NativeCitation } from "$lib/types";
+import { ChevronDown, ChevronUp } from "@lucide/svelte";
 
-	interface Props {
-		citations: NativeCitation[];
-	}
+interface Props {
+	citations: NativeCitation[];
+}
 
-	let { citations }: Props = $props();
-	let expanded = $state(true);
+const { citations }: Props = $props();
+const expanded = $state(true);
 
-	// Deduplicate citations by source, keeping first occurrence
-	const uniqueCitations = $derived(() => {
-		const seen = new Set<string>();
-		const result: Array<NativeCitation & { index: number }> = [];
-		let idx = 1;
-		for (const c of citations) {
-			if (!seen.has(c.source)) {
-				seen.add(c.source);
-				result.push({ ...c, index: idx++ });
-			}
+// Deduplicate citations by source, keeping first occurrence
+const uniqueCitations = $derived(() => {
+	const seen = new Set<string>();
+	const result: Array<NativeCitation & { index: number }> = [];
+	let idx = 1;
+	for (const c of citations) {
+		if (!seen.has(c.source)) {
+			seen.add(c.source);
+			result.push({ ...c, index: idx++ });
 		}
-		return result;
-	});
+	}
+	return result;
+});
 </script>
 
 {#if citations.length > 0}

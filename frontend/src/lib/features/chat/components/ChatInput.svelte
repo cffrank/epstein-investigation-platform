@@ -1,30 +1,30 @@
 <script lang="ts">
-	import { Textarea } from '$lib/components/ui/textarea';
-	import { Send } from '@lucide/svelte';
+import { Textarea } from "$lib/components/ui/textarea";
+import { Send } from "@lucide/svelte";
 
-	interface Props {
-		value: string;
-		disabled?: boolean;
-		onsubmit: (value: string) => void;
-		oninput: (value: string) => void;
-	}
+interface Props {
+	value: string;
+	disabled?: boolean;
+	onsubmit: (value: string) => void;
+	oninput: (value: string) => void;
+}
 
-	let { value = $bindable(), disabled = false, onsubmit, oninput }: Props = $props();
+const { value = $bindable(), disabled = false, onsubmit, oninput }: Props = $props();
 
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-			e.preventDefault();
-			if (value.trim() && !disabled) {
-				onsubmit(value);
-			}
-		}
-	}
-
-	function handleSubmit() {
+function handleKeydown(e: KeyboardEvent) {
+	if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+		e.preventDefault();
 		if (value.trim() && !disabled) {
 			onsubmit(value);
 		}
 	}
+}
+
+function handleSubmit() {
+	if (value.trim() && !disabled) {
+		onsubmit(value);
+	}
+}
 </script>
 
 <div class="border-t border-border bg-background p-4">

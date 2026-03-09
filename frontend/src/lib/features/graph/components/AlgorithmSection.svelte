@@ -1,59 +1,59 @@
 <script lang="ts">
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import { entityColor } from '$lib/utils';
+import { Badge } from "$lib/components/ui/badge";
+import { Button } from "$lib/components/ui/button";
+import { entityColor } from "$lib/utils";
 
-	interface AlgorithmResult {
-		id: string;
-		type: string;
-		name: string;
-		pagerank: number | null;
-		communityId: number | null;
-		betweenness: number | null;
-		connections: number;
-	}
+interface AlgorithmResult {
+	id: string;
+	type: string;
+	name: string;
+	pagerank: number | null;
+	communityId: number | null;
+	betweenness: number | null;
+	connections: number;
+}
 
-	interface Props {
-		title: string;
-		results: AlgorithmResult[];
-		scoreKey: 'pagerank' | 'betweenness';
-		active: boolean;
-		onActivate: () => void;
-		onEntityClick: (id: string) => void;
-		maxResults?: number;
-	}
+interface Props {
+	title: string;
+	results: AlgorithmResult[];
+	scoreKey: "pagerank" | "betweenness";
+	active: boolean;
+	onActivate: () => void;
+	onEntityClick: (id: string) => void;
+	maxResults?: number;
+}
 
-	let {
-		title,
-		results,
-		scoreKey,
-		active,
-		onActivate,
-		onEntityClick,
-		maxResults = 10
-	}: Props = $props();
+const {
+	title,
+	results,
+	scoreKey,
+	active,
+	onActivate,
+	onEntityClick,
+	maxResults = 10,
+}: Props = $props();
 
-	let showAll = $state(false);
+const showAll = $state(false);
 
-	let displayResults = $derived(showAll ? results.slice(0, 25) : results.slice(0, maxResults));
+const displayResults = $derived(showAll ? results.slice(0, 25) : results.slice(0, maxResults));
 
-	let maxScore = $derived(() => {
-		const scores = results
-			.map((r) => (scoreKey === 'pagerank' ? r.pagerank : r.betweenness))
-			.filter((s): s is number => s != null);
-		return scores.length > 0 ? Math.max(...scores) : 1;
-	});
+const maxScore = $derived(() => {
+	const scores = results
+		.map((r) => (scoreKey === "pagerank" ? r.pagerank : r.betweenness))
+		.filter((s): s is number => s != null);
+	return scores.length > 0 ? Math.max(...scores) : 1;
+});
 
-	function getScore(result: AlgorithmResult): number {
-		const val = scoreKey === 'pagerank' ? result.pagerank : result.betweenness;
-		return val ?? 0;
-	}
+function getScore(result: AlgorithmResult): number {
+	const val = scoreKey === "pagerank" ? result.pagerank : result.betweenness;
+	return val ?? 0;
+}
 
-	function getScoreWidth(result: AlgorithmResult): number {
-		const score = getScore(result);
-		const max = maxScore();
-		return max > 0 ? (score / max) * 100 : 0;
-	}
+function getScoreWidth(result: AlgorithmResult): number {
+	const score = getScore(result);
+	const max = maxScore();
+	return max > 0 ? (score / max) * 100 : 0;
+}
 </script>
 
 <div>

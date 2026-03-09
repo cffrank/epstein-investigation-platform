@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { Command as CommandPrimitive } from "bits-ui";
-	import { cn } from "$lib/utils";
+import { cn } from "$lib/utils";
+import type { Command as CommandPrimitive } from "bits-ui";
 
-	let {
-		ref = $bindable(null),
-		class: className,
-		...restProps
-	}: CommandPrimitive.EmptyProps = $props();
+const {
+	ref = $bindable(null),
+	class: className,
+	...restProps
+}: CommandPrimitive.EmptyProps = $props();
 </script>
 
 <CommandPrimitive.Empty

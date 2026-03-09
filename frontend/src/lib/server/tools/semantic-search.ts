@@ -1,24 +1,24 @@
-import type Anthropic from '@anthropic-ai/sdk';
-import { qdrantClient } from '$lib/server/qdrant';
-import { query } from '$lib/server/db';
+import { query } from "$lib/server/db";
+import { qdrantClient } from "$lib/server/qdrant";
+import type Anthropic from "@anthropic-ai/sdk";
 
 export const semanticSearchTool: Anthropic.Messages.Tool = {
-	name: 'semantic_search',
+	name: "semantic_search",
 	description:
-		'Search documents using semantic similarity. Finds conceptually related content even without exact keyword matches. Best for finding documents about a topic or concept.',
+		"Search documents using semantic similarity. Finds conceptually related content even without exact keyword matches. Best for finding documents about a topic or concept.",
 	input_schema: {
-		type: 'object' as const,
+		type: "object" as const,
 		properties: {
 			query: {
-				type: 'string',
-				description: 'Natural language description of what to search for.',
+				type: "string",
+				description: "Natural language description of what to search for.",
 			},
 			limit: {
-				type: 'number',
-				description: 'Maximum number of results to return. Default 8, max 20.',
+				type: "number",
+				description: "Maximum number of results to return. Default 8, max 20.",
 			},
 		},
-		required: ['query'],
+		required: ["query"],
 	},
 };
 
@@ -37,8 +37,8 @@ interface DocumentMeta {
 
 export async function executeSemanticSearch(
 	input: { query: string; limit?: number },
-	platform: App.Platform
-): Promise<Anthropic.Messages.ToolResultBlockParam['content']> {
+	platform: App.Platform,
+): Promise<Anthropic.Messages.ToolResultBlockParam["content"]> {
 	const limit = Math.min(Math.max(input.limit ?? 8, 1), 20);
 	const env = platform.env as { API_BASE_URL: string; API_SECRET_KEY: string };
 
@@ -46,10 +46,10 @@ export async function executeSemanticSearch(
 	let embedding: number[];
 	try {
 		const embeddingResponse = await fetch(`${env.API_BASE_URL}/api/embeddings`, {
-			method: 'POST',
+			method: "POST",
 			headers: {
-				'Content-Type': 'application/json',
-				'X-API-Key': env.API_SECRET_KEY,
+				"Content-Type": "application/json",
+				"X-API-Key": env.API_SECRET_KEY,
 			},
 			body: JSON.stringify({ text: input.query }),
 		});
@@ -57,10 +57,10 @@ export async function executeSemanticSearch(
 		if (!embeddingResponse.ok) {
 			// Fallback: try the Cloudflare Worker AI embedding endpoint
 			const workerResponse = await fetch(`${env.API_BASE_URL}/ai/embedding`, {
-				method: 'POST',
+				method: "POST",
 				headers: {
-					'Content-Type': 'application/json',
-					'X-API-Key': env.API_SECRET_KEY,
+					"Content-Type": "application/json",
+					"X-API-Key": env.API_SECRET_KEY,
 				},
 				body: JSON.stringify({ text: input.query }),
 			});
@@ -68,8 +68,8 @@ export async function executeSemanticSearch(
 			if (!workerResponse.ok) {
 				return [
 					{
-						type: 'text' as const,
-						text: 'Unable to generate embedding for semantic search. The embedding service is unavailable.',
+						type: "text" as const,
+						text: "Unable to generate embedding for semantic search. The embedding service is unavailable.",
 					},
 				];
 			}
@@ -83,8 +83,8 @@ export async function executeSemanticSearch(
 	} catch {
 		return [
 			{
-				type: 'text' as const,
-				text: 'Failed to connect to the embedding service for semantic search.',
+				type: "text" as const,
+				text: "Failed to connect to the embedding service for semantic search.",
 			},
 		];
 	}
@@ -96,7 +96,7 @@ export async function executeSemanticSearch(
 	if (searchResults.length === 0) {
 		return [
 			{
-				type: 'text' as const,
+				type: "text" as const,
 				text: `No semantically similar documents found for "${input.query}".`,
 			},
 		];
@@ -108,30 +108,30 @@ export async function executeSemanticSearch(
 			searchResults.map((r) => {
 				const p = r.payload as unknown as QdrantPayload;
 				return p.document_id || p.doc_id;
-			})
+			}),
 		),
 	];
 
 	const documents = await query<DocumentMeta>(
 		platform,
-		'SELECT id, filename, source FROM documents WHERE id = ANY($1)',
-		[docIds]
+		"SELECT id, filename, source FROM documents WHERE id = ANY($1)",
+		[docIds],
 	);
 	const docMap = new Map(documents.map((d) => [d.id, d]));
 
 	return searchResults.map((result) => {
 		const payload = result.payload as unknown as QdrantPayload;
-		const docId = payload.document_id || payload.doc_id || '';
+		const docId = payload.document_id || payload.doc_id || "";
 		const doc = docMap.get(docId);
-		const text = (payload.text_preview || payload.text || 'No text available').slice(0, 1500);
+		const text = (payload.text_preview || payload.text || "No text available").slice(0, 1500);
 
 		return {
-			type: 'search_result' as const,
+			type: "search_result" as const,
 			source: `/documents/${docId}`,
-			title: doc?.filename || 'Unknown Document',
+			title: doc?.filename || "Unknown Document",
 			content: [
 				{
-					type: 'text' as const,
+					type: "text" as const,
 					text: `[Similarity: ${result.score.toFixed(3)}] ${text}`,
 				},
 			],

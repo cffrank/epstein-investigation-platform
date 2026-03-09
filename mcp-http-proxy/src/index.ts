@@ -1,22 +1,22 @@
-import { Hono } from "hono";
-import { serve } from "@hono/node-server";
-import pg from "pg";
-import { createClient, type RedisClientType } from "redis";
 import { createHash } from "node:crypto";
 import {
-	createRequireApiKey,
-	buildDocumentStatsQuery,
-	buildFulltextSearchQuery,
-	buildEntityListQuery,
 	type SqlQuery,
+	buildDocumentStatsQuery,
+	buildEntityListQuery,
+	buildFulltextSearchQuery,
+	createRequireApiKey,
 } from "@epstein/shared";
+import { serve } from "@hono/node-server";
+import { Hono } from "hono";
+import pg from "pg";
+import { type RedisClientType, createClient } from "redis";
 
 const { Pool } = pg;
 
 // Safe defaults: always connect to localhost/internal host, never public IP
 const pool = new Pool({
 	host: process.env.POSTGRES_HOST || "postgres",
-	port: parseInt(process.env.POSTGRES_PORT || "5432"),
+	port: Number.parseInt(process.env.POSTGRES_PORT || "5432"),
 	database: process.env.POSTGRES_DB || "platform",
 	user: process.env.POSTGRES_USER || "investigation",
 	password: process.env.POSTGRES_PASSWORD,
@@ -27,9 +27,7 @@ const pool = new Pool({
 // Fail-closed: refuse to start without API key
 const API_SECRET_KEY = process.env.API_SECRET_KEY;
 if (!API_SECRET_KEY) {
-	console.error(
-		"FATAL: API_SECRET_KEY not set. Refusing to start without authentication.",
-	);
+	console.error("FATAL: API_SECRET_KEY not set. Refusing to start without authentication.");
 	process.exit(1);
 }
 
@@ -42,25 +40,21 @@ const NEO4J_PASSWORD = process.env.NEO4J_PASSWORD || "";
 
 // --- Redis setup ---
 const redis: RedisClientType = createClient({ url: REDIS_URL });
-redis.on("error", (err: Error) =>
-	console.error("Redis error:", err.message),
-);
+redis.on("error", (err: Error) => console.error("Redis error:", err.message));
 await redis.connect().catch((err: Error) => {
 	console.error("Redis connection failed:", err.message);
 });
 
 function cacheKey(sql: string, params?: unknown[]): string {
 	const raw = JSON.stringify({ sql, params: params || [] });
-	return "qc:" + createHash("sha256").update(raw).digest("hex").slice(0, 16);
+	return `qc:${createHash("sha256").update(raw).digest("hex").slice(0, 16)}`;
 }
 
 function getTTL(sql: string): number {
 	const upper = sql.trim().toUpperCase();
-	if (upper.includes("COUNT(*)") && upper.includes("FROM DOCUMENTS"))
-		return 300;
+	if (upper.includes("COUNT(*)") && upper.includes("FROM DOCUMENTS")) return 300;
 	if (upper.includes("INFORMATION_SCHEMA")) return 3600;
-	if (upper.includes("WHERE ID =") || upper.includes("WHERE ID = ANY"))
-		return 1800;
+	if (upper.includes("WHERE ID =") || upper.includes("WHERE ID = ANY")) return 1800;
 	if (upper.includes("LIMIT")) return 600;
 	return 120;
 }
@@ -71,10 +65,7 @@ interface CachedQueryResult {
 	_cached?: boolean;
 }
 
-async function cachedQuery(
-	sql: string,
-	params?: unknown[],
-): Promise<CachedQueryResult> {
+async function cachedQuery(sql: string, params?: unknown[]): Promise<CachedQueryResult> {
 	const key = cacheKey(sql, params);
 
 	if (redis.isReady) {
@@ -143,8 +134,7 @@ app.get("/tools", (c) => {
 		tools: [
 			{
 				name: "query",
-				description:
-					"Execute a read-only SQL query (with optional parameterized values)",
+				description: "Execute a read-only SQL query (with optional parameterized values)",
 				inputSchema: {
 					type: "object",
 					properties: {
@@ -264,10 +254,7 @@ app.post("/tools/:name", requireAuth, async (c) => {
 					return c.json({ error: "sql parameter required" }, 400);
 				}
 				const trimmed = sql.trim().toUpperCase();
-				if (
-					!trimmed.startsWith("SELECT") &&
-					!trimmed.startsWith("WITH")
-				) {
+				if (!trimmed.startsWith("SELECT") && !trimmed.startsWith("WITH")) {
 					return c.json({ error: "Only SELECT queries allowed" }, 400);
 				}
 				const data = await cachedQuery(sql, params);
@@ -326,10 +313,7 @@ app.post("/tools/:name", requireAuth, async (c) => {
 					offset?: number;
 				};
 				const entityQuery = buildEntityListQuery({ type, limit, offset });
-				const data = await cachedQuery(
-					entityQuery.text,
-					entityQuery.values,
-				);
+				const data = await cachedQuery(entityQuery.text, entityQuery.values);
 				return c.json(data);
 			}
 
@@ -349,10 +333,10 @@ app.post("/tools/:name", requireAuth, async (c) => {
 			}
 
 			default:
-				return c.json({ error: "Unknown tool: " + toolName }, 404);
+				return c.json({ error: `Unknown tool: ${toolName}` }, 404);
 		}
 	} catch (error) {
-		console.error("Tool " + toolName + " error:", error);
+		console.error(`Tool ${toolName} error:`, error);
 		return c.json({ error: (error as Error).message }, 500);
 	}
 });
@@ -393,22 +377,19 @@ app.get("/qdrant/*", requireAuth, async (c) => {
 app.post("/neo4j/*", requireAuth, async (c) => {
 	const path = c.req.path.replace(/^\/neo4j/, "");
 	const body = await c.req.text();
-	const auth = Buffer.from(NEO4J_USER + ":" + NEO4J_PASSWORD).toString(
-		"base64",
-	);
+	const auth = Buffer.from(`${NEO4J_USER}:${NEO4J_PASSWORD}`).toString("base64");
 
 	const resp = await fetch(NEO4J_URL + path, {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
-			Authorization: "Basic " + auth,
+			Authorization: `Basic ${auth}`,
 		},
 		body,
 	});
 	const data = await resp.text();
 	return c.body(data, resp.status as 200, {
-		"Content-Type":
-			resp.headers.get("Content-Type") || "application/json",
+		"Content-Type": resp.headers.get("Content-Type") || "application/json",
 	});
 });
 
@@ -418,6 +399,6 @@ process.on("SIGTERM", async () => {
 	process.exit(0);
 });
 
-const port = parseInt(process.env.PORT || "3002");
-console.log("MCP HTTP Proxy starting on port " + port);
+const port = Number.parseInt(process.env.PORT || "3002");
+console.log(`MCP HTTP Proxy starting on port ${port}`);
 serve({ fetch: app.fetch, port });

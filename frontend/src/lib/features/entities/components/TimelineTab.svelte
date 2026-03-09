@@ -1,25 +1,25 @@
 <script lang="ts">
-	import * as Card from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
-	import type { TimelineEvent } from '$lib/types';
+import { Badge } from "$lib/components/ui/badge";
+import * as Card from "$lib/components/ui/card";
+import type { TimelineEvent } from "$lib/types";
 
-	interface Props {
-		events: TimelineEvent[];
+interface Props {
+	events: TimelineEvent[];
+}
+
+const { events }: Props = $props();
+
+function formatDate(dateStr: string): string {
+	try {
+		return new Date(dateStr).toLocaleDateString("en-US", {
+			year: "numeric",
+			month: "long",
+			day: "numeric",
+		});
+	} catch {
+		return dateStr;
 	}
-
-	let { events }: Props = $props();
-
-	function formatDate(dateStr: string): string {
-		try {
-			return new Date(dateStr).toLocaleDateString('en-US', {
-				year: 'numeric',
-				month: 'long',
-				day: 'numeric',
-			});
-		} catch {
-			return dateStr;
-		}
-	}
+}
 </script>
 
 <div class="space-y-4">

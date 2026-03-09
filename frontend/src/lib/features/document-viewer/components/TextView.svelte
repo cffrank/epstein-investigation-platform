@@ -1,131 +1,124 @@
 <script lang="ts">
-	import type { EntityRef } from '$lib/types';
-	import { cn } from '$lib/utils';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import { Search } from '@lucide/svelte';
-	import { sanitizeDocumentText } from '$lib/utils/sanitize';
+import Input from "$lib/components/ui/input/input.svelte";
+import type { EntityRef } from "$lib/types";
+import { cn } from "$lib/utils";
+import { sanitizeDocumentText } from "$lib/utils/sanitize";
+import { Search } from "@lucide/svelte";
 
-	let {
-		text,
-		entities,
-		searchTerm = ''
-	}: {
-		text: string;
-		entities: EntityRef[];
-		searchTerm?: string;
-	} = $props();
+const {
+	text,
+	entities,
+	searchTerm = "",
+}: {
+	text: string;
+	entities: EntityRef[];
+	searchTerm?: string;
+} = $props();
 
-	let localSearchTerm = $state('');
-	let currentMatchIndex = $state(0);
+const localSearchTerm = $state("");
+let currentMatchIndex = $state(0);
 
-	const entityColors: Record<string, string> = {
-		Person: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-		Organization: 'bg-green-500/20 text-green-400 border-green-500/30',
-		Location: 'bg-orange-500/20 text-orange-400 border-orange-500/30'
-	};
+const entityColors: Record<string, string> = {
+	Person: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+	Organization: "bg-green-500/20 text-green-400 border-green-500/30",
+	Location: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+};
 
-	function escapeHtml(str: string): string {
-		return str
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;')
-			.replace(/"/g, '&quot;');
+function escapeHtml(str: string): string {
+	return str
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;");
+}
+
+function buildHighlightedHtml(rawText: string, search: string): string {
+	if (!rawText) return "";
+
+	// Build entity patterns for highlighting
+	const entityPatterns = entities.map((e) => ({
+		name: e.name,
+		type: e.type,
+		pattern: new RegExp(`\\b${e.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi"),
+	}));
+
+	// Collect entity matches
+	const entityMatches: Array<{ index: number; length: number; entity: EntityRef }> = [];
+	for (const { name, type, pattern } of entityPatterns) {
+		let match: RegExpExecArray | null = null;
+		pattern.lastIndex = 0;
+		match = pattern.exec(rawText);
+		while (match !== null) {
+			entityMatches.push({
+				index: match.index,
+				length: match[0].length,
+				entity: { id: "", name, type },
+			});
+			match = pattern.exec(rawText);
+		}
 	}
+	entityMatches.sort((a, b) => a.index - b.index);
 
-	function buildHighlightedHtml(rawText: string, search: string): string {
-		if (!rawText) return '';
-
-		// Build entity patterns for highlighting
-		const entityPatterns = entities.map((e) => ({
-			name: e.name,
-			type: e.type,
-			pattern: new RegExp(`\\b${e.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi')
-		}));
-
-		// Collect entity matches
-		const entityMatches: Array<{ index: number; length: number; entity: EntityRef }> = [];
-		for (const { name, type, pattern } of entityPatterns) {
-			let match;
-			pattern.lastIndex = 0;
-			while ((match = pattern.exec(rawText)) !== null) {
-				entityMatches.push({
-					index: match.index,
-					length: match[0].length,
-					entity: { id: '', name, type }
-				});
+	// Build segments
+	const segments: Array<{ text: string; entity?: EntityRef }> = [];
+	let lastIndex = 0;
+	for (const m of entityMatches) {
+		if (m.index >= lastIndex) {
+			if (m.index > lastIndex) {
+				segments.push({ text: rawText.substring(lastIndex, m.index) });
 			}
+			segments.push({ text: rawText.substring(m.index, m.index + m.length), entity: m.entity });
+			lastIndex = m.index + m.length;
 		}
-		entityMatches.sort((a, b) => a.index - b.index);
+	}
+	if (lastIndex < rawText.length) {
+		segments.push({ text: rawText.substring(lastIndex) });
+	}
 
-		// Build segments
-		const segments: Array<{ text: string; entity?: EntityRef }> = [];
-		let lastIndex = 0;
-		for (const m of entityMatches) {
-			if (m.index >= lastIndex) {
-				if (m.index > lastIndex) {
-					segments.push({ text: rawText.substring(lastIndex, m.index) });
-				}
-				segments.push({ text: rawText.substring(m.index, m.index + m.length), entity: m.entity });
-				lastIndex = m.index + m.length;
+	// Convert to HTML
+	let html = segments
+		.map((seg) => {
+			if (seg.entity) {
+				const colorClass = entityColors[seg.entity.type] || "";
+				return `<mark class="border rounded px-0.5 ${colorClass}">${escapeHtml(seg.text)}</mark>`;
 			}
-		}
-		if (lastIndex < rawText.length) {
-			segments.push({ text: rawText.substring(lastIndex) });
-		}
+			return escapeHtml(seg.text);
+		})
+		.join("");
 
-		// Convert to HTML
-		let html = segments
-			.map((seg) => {
-				if (seg.entity) {
-					const colorClass = entityColors[seg.entity.type] || '';
-					return `<mark class="border rounded px-0.5 ${colorClass}">${escapeHtml(seg.text)}</mark>`;
-				}
-				return escapeHtml(seg.text);
-			})
-			.join('');
-
-		// Highlight search term
-		if (search) {
-			const searchPattern = new RegExp(
-				`(${search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`,
-				'gi'
-			);
-			html = html.replace(
-				searchPattern,
-				'<mark class="bg-yellow-500/50 text-yellow-100">$1</mark>'
-			);
-		}
-
-		return html;
+	// Highlight search term
+	if (search) {
+		const searchPattern = new RegExp(`(${search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+		html = html.replace(searchPattern, '<mark class="bg-yellow-500/50 text-yellow-100">$1</mark>');
 	}
 
-	// Derive totalMatches separately (no state mutation)
-	const totalMatches = $derived.by(() => {
-		if (!localSearchTerm || !text) return 0;
-		const rawPattern = new RegExp(
-			localSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
-			'gi'
-		);
-		return (text.match(rawPattern) || []).length;
-	});
+	return html;
+}
 
-	const highlightedHtml = $derived(buildHighlightedHtml(text, localSearchTerm));
+// Derive totalMatches separately (no state mutation)
+const totalMatches = $derived.by(() => {
+	if (!localSearchTerm || !text) return 0;
+	const rawPattern = new RegExp(localSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+	return (text.match(rawPattern) || []).length;
+});
 
-	function handleSearch() {
-		currentMatchIndex = 0;
+const highlightedHtml = $derived(buildHighlightedHtml(text, localSearchTerm));
+
+function handleSearch() {
+	currentMatchIndex = 0;
+}
+
+function nextMatch() {
+	if (totalMatches > 0) {
+		currentMatchIndex = (currentMatchIndex + 1) % totalMatches;
 	}
+}
 
-	function nextMatch() {
-		if (totalMatches > 0) {
-			currentMatchIndex = (currentMatchIndex + 1) % totalMatches;
-		}
+function previousMatch() {
+	if (totalMatches > 0) {
+		currentMatchIndex = (currentMatchIndex - 1 + totalMatches) % totalMatches;
 	}
-
-	function previousMatch() {
-		if (totalMatches > 0) {
-			currentMatchIndex = (currentMatchIndex - 1 + totalMatches) % totalMatches;
-		}
-	}
+}
 </script>
 
 <div class="flex h-full flex-col">

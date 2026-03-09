@@ -1,23 +1,23 @@
-import type Anthropic from '@anthropic-ai/sdk';
-import { query } from '$lib/server/db';
+import { query } from "$lib/server/db";
+import type Anthropic from "@anthropic-ai/sdk";
 
 export const searchDocumentsTool: Anthropic.Messages.Tool = {
-	name: 'search_documents',
+	name: "search_documents",
 	description:
-		'Search the Epstein investigation document corpus using full-text search. Returns matching documents with highlighted excerpts. Use for keyword-based searches across 960K+ documents.',
+		"Search the Epstein investigation document corpus using full-text search. Returns matching documents with highlighted excerpts. Use for keyword-based searches across 960K+ documents.",
 	input_schema: {
-		type: 'object' as const,
+		type: "object" as const,
 		properties: {
 			query: {
-				type: 'string',
-				description: 'Search query text. Supports natural language queries.',
+				type: "string",
+				description: "Search query text. Supports natural language queries.",
 			},
 			limit: {
-				type: 'number',
-				description: 'Maximum number of results to return. Default 10, max 25.',
+				type: "number",
+				description: "Maximum number of results to return. Default 10, max 25.",
 			},
 		},
-		required: ['query'],
+		required: ["query"],
 	},
 };
 
@@ -30,8 +30,8 @@ interface SearchDocumentResult {
 
 export async function executeSearchDocuments(
 	input: { query: string; limit?: number },
-	platform: App.Platform
-): Promise<Anthropic.Messages.ToolResultBlockParam['content']> {
+	platform: App.Platform,
+): Promise<Anthropic.Messages.ToolResultBlockParam["content"]> {
 	const limit = Math.min(Math.max(input.limit ?? 10, 1), 25);
 
 	const results = await query<SearchDocumentResult>(
@@ -44,26 +44,26 @@ export async function executeSearchDocuments(
 		WHERE search_vector @@ plainto_tsquery('english', $1)
 		ORDER BY ts_rank(search_vector, plainto_tsquery('english', $1)) DESC
 		LIMIT $2`,
-		[input.query, limit]
+		[input.query, limit],
 	);
 
 	if (results.length === 0) {
 		return [
 			{
-				type: 'text' as const,
+				type: "text" as const,
 				text: `No documents found matching "${input.query}".`,
 			},
 		];
 	}
 
 	return results.map((doc) => ({
-		type: 'search_result' as const,
+		type: "search_result" as const,
 		source: `/documents/${doc.id}`,
 		title: doc.filename,
 		content: [
 			{
-				type: 'text' as const,
-				text: (doc.excerpt || 'No text available').slice(0, 1500),
+				type: "text" as const,
+				text: (doc.excerpt || "No text available").slice(0, 1500),
 			},
 		],
 		citations: { enabled: true },

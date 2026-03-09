@@ -1,10 +1,10 @@
-import type { SavedSearch } from '$lib/types';
+import type { SavedSearch } from "$lib/types";
 
-const STORAGE_KEY = 'epstein-saved-searches';
+const STORAGE_KEY = "epstein-saved-searches";
 const MAX_SAVED = 100;
 
 export function loadSavedSearches(): SavedSearch[] {
-	if (typeof window === 'undefined') return [];
+	if (typeof window === "undefined") return [];
 	try {
 		const raw = localStorage.getItem(STORAGE_KEY);
 		if (!raw) return [];

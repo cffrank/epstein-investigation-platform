@@ -1,113 +1,110 @@
 <script lang="ts">
-	import { parseSSE } from '$lib/features/chat/sse';
-	import ToolCallPanel from '$lib/features/chat/components/ToolCallPanel.svelte';
-	import CitationPanel from '$lib/features/chat/components/CitationPanel.svelte';
-	import { sanitizeChatContent } from '$lib/utils/sanitize';
-	import { Button } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
-	import { Sparkles, RefreshCw } from '@lucide/svelte';
-	import type { ToolCall, NativeCitation, EntityBiography } from '$lib/types';
+import { Button } from "$lib/components/ui/button";
+import * as Card from "$lib/components/ui/card";
+import CitationPanel from "$lib/features/chat/components/CitationPanel.svelte";
+import ToolCallPanel from "$lib/features/chat/components/ToolCallPanel.svelte";
+import { parseSSE } from "$lib/features/chat/sse";
+import type { EntityBiography, NativeCitation, ToolCall } from "$lib/types";
+import { sanitizeChatContent } from "$lib/utils/sanitize";
+import { RefreshCw, Sparkles } from "@lucide/svelte";
 
-	interface Props {
-		entityId: string;
-		entityName: string;
-		biography: EntityBiography | null;
+interface Props {
+	entityId: string;
+	entityName: string;
+	biography: EntityBiography | null;
+}
+
+const { entityId, entityName, biography }: Props = $props();
+
+let currentBio = $state<EntityBiography | null>(biography);
+let isGenerating = $state(false);
+let streamedContent = $state("");
+let toolCalls = $state<ToolCall[]>([]);
+let citations = $state<NativeCitation[]>([]);
+let errorMsg = $state<string | null>(null);
+
+function formatDate(dateStr: string): string {
+	try {
+		return new Date(dateStr).toLocaleDateString("en-US", {
+			year: "numeric",
+			month: "long",
+			day: "numeric",
+		});
+	} catch {
+		return dateStr;
 	}
+}
 
-	let { entityId, entityName, biography }: Props = $props();
+async function generateBiography() {
+	isGenerating = true;
+	streamedContent = "";
+	toolCalls = [];
+	citations = [];
+	errorMsg = null;
 
-	let currentBio = $state<EntityBiography | null>(biography);
-	let isGenerating = $state(false);
-	let streamedContent = $state('');
-	let toolCalls = $state<ToolCall[]>([]);
-	let citations = $state<NativeCitation[]>([]);
-	let errorMsg = $state<string | null>(null);
+	try {
+		const response = await fetch(`/api/entities/${entityId}/biography`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ name: entityName }),
+		});
 
-	function formatDate(dateStr: string): string {
-		try {
-			return new Date(dateStr).toLocaleDateString('en-US', {
-				year: 'numeric',
-				month: 'long',
-				day: 'numeric',
-			});
-		} catch {
-			return dateStr;
+		if (!response.ok || !response.body) {
+			throw new Error("Biography generation failed");
 		}
-	}
 
-	async function generateBiography() {
-		isGenerating = true;
-		streamedContent = '';
-		toolCalls = [];
-		citations = [];
-		errorMsg = null;
-
-		try {
-			const response = await fetch(`/api/entities/${entityId}/biography`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name: entityName }),
-			});
-
-			if (!response.ok || !response.body) {
-				throw new Error('Biography generation failed');
-			}
-
-			for await (const event of parseSSE(response.body)) {
-				switch (event.event) {
-					case 'text_delta': {
-						const data = JSON.parse(event.data) as { text: string };
-						streamedContent += data.text;
-						break;
+		for await (const event of parseSSE(response.body)) {
+			switch (event.event) {
+				case "text_delta": {
+					const data = JSON.parse(event.data) as { text: string };
+					streamedContent += data.text;
+					break;
+				}
+				case "tool_call": {
+					const data = JSON.parse(event.data) as { id: string; name: string };
+					toolCalls = [...toolCalls, { id: data.id, name: data.name, status: "running" as const }];
+					break;
+				}
+				case "tool_result": {
+					const data = JSON.parse(event.data) as {
+						id: string;
+						status: string;
+						resultCount?: number;
+					};
+					const tc = toolCalls.find((t) => t.id === data.id);
+					if (tc) {
+						tc.status = (data.status as "complete" | "error") || "complete";
+						tc.resultCount = data.resultCount;
 					}
-					case 'tool_call': {
-						const data = JSON.parse(event.data) as { id: string; name: string };
-						toolCalls = [
-							...toolCalls,
-							{ id: data.id, name: data.name, status: 'running' as const },
-						];
-						break;
-					}
-					case 'tool_result': {
-						const data = JSON.parse(event.data) as {
-							id: string;
-							status: string;
-							resultCount?: number;
-						};
-						const tc = toolCalls.find((t) => t.id === data.id);
-						if (tc) {
-							tc.status = (data.status as 'complete' | 'error') || 'complete';
-							tc.resultCount = data.resultCount;
-						}
-						toolCalls = [...toolCalls];
-						break;
-					}
-					case 'citations_delta': {
-						const data = JSON.parse(event.data) as { citation: NativeCitation };
-						citations = [...citations, data.citation];
-						break;
-					}
-					case 'done':
-						currentBio = {
-							content: streamedContent,
-							generated_at: new Date().toISOString(),
-							model: 'claude-sonnet-4-6',
-							citations: citations.length > 0 ? citations : undefined,
-						};
-						break;
-					case 'error': {
-						const data = JSON.parse(event.data) as { message: string };
-						errorMsg = data.message;
-						break;
-					}
+					toolCalls = [...toolCalls];
+					break;
+				}
+				case "citations_delta": {
+					const data = JSON.parse(event.data) as { citation: NativeCitation };
+					citations = [...citations, data.citation];
+					break;
+				}
+				case "done":
+					currentBio = {
+						content: streamedContent,
+						generated_at: new Date().toISOString(),
+						model: "claude-sonnet-4-6",
+						citations: citations.length > 0 ? citations : undefined,
+					};
+					break;
+				case "error": {
+					const data = JSON.parse(event.data) as { message: string };
+					errorMsg = data.message;
+					break;
 				}
 			}
-		} catch (e) {
-			errorMsg = e instanceof Error ? e.message : 'Unknown error';
-		} finally {
-			isGenerating = false;
 		}
+	} catch (e) {
+		errorMsg = e instanceof Error ? e.message : "Unknown error";
+	} finally {
+		isGenerating = false;
 	}
+}
 </script>
 
 <div class="space-y-4">

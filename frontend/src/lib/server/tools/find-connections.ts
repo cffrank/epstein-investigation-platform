@@ -1,34 +1,34 @@
-import type Anthropic from '@anthropic-ai/sdk';
-import { neo4jClient } from '$lib/server/neo4j';
+import { neo4jClient } from "$lib/server/neo4j";
+import type Anthropic from "@anthropic-ai/sdk";
 
 export const findConnectionsTool: Anthropic.Messages.Tool = {
-	name: 'find_connections',
+	name: "find_connections",
 	description:
-		'Discover connections between two entities in the knowledge graph. Finds shortest paths and shared associations. Useful for investigating relationships between people, organizations, or locations.',
+		"Discover connections between two entities in the knowledge graph. Finds shortest paths and shared associations. Useful for investigating relationships between people, organizations, or locations.",
 	input_schema: {
-		type: 'object' as const,
+		type: "object" as const,
 		properties: {
 			entity_a: {
-				type: 'string',
-				description: 'Name of the first entity (case-insensitive partial match).',
+				type: "string",
+				description: "Name of the first entity (case-insensitive partial match).",
 			},
 			entity_b: {
-				type: 'string',
-				description: 'Name of the second entity (case-insensitive partial match).',
+				type: "string",
+				description: "Name of the second entity (case-insensitive partial match).",
 			},
 			max_path_length: {
-				type: 'number',
-				description: 'Maximum path length to search. Default 4, range 2-6.',
+				type: "number",
+				description: "Maximum path length to search. Default 4, range 2-6.",
 			},
 		},
-		required: ['entity_a', 'entity_b'],
+		required: ["entity_a", "entity_b"],
 	},
 };
 
 export async function executeFindConnections(
 	input: { entity_a: string; entity_b: string; max_path_length?: number },
-	platform: App.Platform
-): Promise<Anthropic.Messages.ToolResultBlockParam['content']> {
+	platform: App.Platform,
+): Promise<Anthropic.Messages.ToolResultBlockParam["content"]> {
 	const neo4j = neo4jClient(platform);
 	const maxLen = Math.min(Math.max(input.max_path_length ?? 4, 2), 6);
 
@@ -45,13 +45,13 @@ export async function executeFindConnections(
 			[n IN pathNodes | labels(n)] as nodeLabels,
 			[r IN pathRels | type(r)] as relTypes,
 			length(path) as pathLength`,
-		{ entityA: input.entity_a, entityB: input.entity_b }
+		{ entityA: input.entity_a, entityB: input.entity_b },
 	);
 
 	if (result.rows.length === 0) {
 		return [
 			{
-				type: 'text' as const,
+				type: "text" as const,
 				text: `No connection found between "${input.entity_a}" and "${input.entity_b}" within ${maxLen} hops. They may not be connected in the knowledge graph, or the path may be longer than ${maxLen} steps.`,
 			},
 		];
@@ -66,27 +66,27 @@ export async function executeFindConnections(
 	// Build readable path description
 	let pathDescription = `## Connection Path (${pathLength} steps)\n\n`;
 	for (let i = 0; i < nodeNames.length; i++) {
-		const labels = (nodeLabels[i] || []).filter((l) => l !== 'Entity');
-		pathDescription += `${nodeNames[i]} [${labels.join(', ')}]`;
+		const labels = (nodeLabels[i] || []).filter((l) => l !== "Entity");
+		pathDescription += `${nodeNames[i]} [${labels.join(", ")}]`;
 		if (i < relTypes.length) {
 			pathDescription += ` --[${relTypes[i]}]--> `;
 		}
 	}
 
-	pathDescription += `\n\n### Path Summary\n`;
+	pathDescription += "\n\n### Path Summary\n";
 	pathDescription += `From: ${nodeNames[0]}\n`;
 	pathDescription += `To: ${nodeNames[nodeNames.length - 1]}\n`;
 	pathDescription += `Steps: ${pathLength}\n`;
-	pathDescription += `Via: ${nodeNames.slice(1, -1).join(' -> ') || 'direct connection'}`;
+	pathDescription += `Via: ${nodeNames.slice(1, -1).join(" -> ") || "direct connection"}`;
 
 	return [
 		{
-			type: 'search_result' as const,
+			type: "search_result" as const,
 			source: `/entities/${encodeURIComponent(nodeNames[0])}`,
 			title: `Connection: ${nodeNames[0]} ↔ ${nodeNames[nodeNames.length - 1]}`,
 			content: [
 				{
-					type: 'text' as const,
+					type: "text" as const,
 					text: pathDescription.slice(0, 1500),
 				},
 			],

@@ -1,160 +1,165 @@
 <script lang="ts">
-	import type { EntityRef, SavedSearch, SearchFilters } from '$lib/types';
-	import { Button } from '$lib/components/ui/button';
-	import { Separator } from '$lib/components/ui/separator';
-	import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '$lib/components/ui/accordion';
-	import { X } from '@lucide/svelte';
-	import EntityAutocomplete from '$lib/features/search/components/EntityAutocomplete.svelte';
-	import SavedSearches from '$lib/features/search/components/SavedSearches.svelte';
+import {
+	Accordion,
+	AccordionContent,
+	AccordionItem,
+	AccordionTrigger,
+} from "$lib/components/ui/accordion";
+import { Button } from "$lib/components/ui/button";
+import { Separator } from "$lib/components/ui/separator";
+import EntityAutocomplete from "$lib/features/search/components/EntityAutocomplete.svelte";
+import SavedSearches from "$lib/features/search/components/SavedSearches.svelte";
+import type { EntityRef, SavedSearch, SearchFilters } from "$lib/types";
+import { X } from "@lucide/svelte";
 
-	interface Props {
-		sources?: string[];
-		docTypes?: string[];
-		classifications?: string[];
-		dateRange?: [string, string];
-		selectedEntities?: EntityRef[];
-		savedSearchRefreshKey?: number;
-		onFilterChange: (filters: SearchFilters) => void;
-		onEntityAdd: (entity: EntityRef) => void;
-		onEntityRemove: (entityId: string) => void;
-		onLoadSavedSearch: (saved: SavedSearch) => void;
+interface Props {
+	sources?: string[];
+	docTypes?: string[];
+	classifications?: string[];
+	dateRange?: [string, string];
+	selectedEntities?: EntityRef[];
+	savedSearchRefreshKey?: number;
+	onFilterChange: (filters: SearchFilters) => void;
+	onEntityAdd: (entity: EntityRef) => void;
+	onEntityRemove: (entityId: string) => void;
+	onLoadSavedSearch: (saved: SavedSearch) => void;
+}
+
+const {
+	sources = [],
+	docTypes = [],
+	classifications = [],
+	dateRange,
+	selectedEntities = [],
+	savedSearchRefreshKey = 0,
+	onFilterChange,
+	onEntityAdd,
+	onEntityRemove,
+	onLoadSavedSearch,
+}: Props = $props();
+
+// Common datasets from the system
+const availableSources = [
+	"dataset_1",
+	"dataset_2",
+	"dataset_9",
+	"dataset_10",
+	"dataset_11",
+	"epstein-docs",
+	"epstein-docs-fulltext",
+	"house-oversight-gdrive",
+];
+
+const availableDocTypes = [
+	"Court Filing",
+	"Legal Document",
+	"Email",
+	"Report",
+	"Testimony",
+	"Photo",
+	"Other",
+];
+
+const availableClassifications = [
+	"email",
+	"deposition_transcript",
+	"court_filing",
+	"financial_record",
+	"flight_log",
+	"calendar_entry",
+	"letter_correspondence",
+	"legal_motion",
+	"fbi_report",
+	"photograph",
+	"handwritten_note",
+	"other",
+];
+
+// Date range presets
+const datePresets = [
+	{ label: "1990s", start: "1990-01-01", end: "1999-12-31" },
+	{ label: "2000s", start: "2000-01-01", end: "2009-12-31" },
+	{ label: "2010s", start: "2010-01-01", end: "2019-12-31" },
+	{ label: "2005", start: "2005-01-01", end: "2005-12-31" },
+	{ label: "2006", start: "2006-01-01", end: "2006-12-31" },
+	{ label: "2008", start: "2008-01-01", end: "2008-12-31" },
+	{ label: "2019", start: "2019-01-01", end: "2019-12-31" },
+];
+
+const selectedSources = $state<Set<string>>(new Set(sources));
+const selectedDocTypes = $state<Set<string>>(new Set(docTypes));
+const selectedClassifications = $state<Set<string>>(new Set(classifications));
+let startDate = $state(dateRange?.[0] || "");
+let endDate = $state(dateRange?.[1] || "");
+
+function toggleSource(source: string) {
+	if (selectedSources.has(source)) {
+		selectedSources.delete(source);
+	} else {
+		selectedSources.add(source);
 	}
+	emitFilters();
+}
 
-	let {
-		sources = [],
-		docTypes = [],
-		classifications = [],
-		dateRange,
-		selectedEntities = [],
-		savedSearchRefreshKey = 0,
-		onFilterChange,
-		onEntityAdd,
-		onEntityRemove,
-		onLoadSavedSearch
-	}: Props = $props();
-
-	// Common datasets from the system
-	const availableSources = [
-		'dataset_1',
-		'dataset_2',
-		'dataset_9',
-		'dataset_10',
-		'dataset_11',
-		'epstein-docs',
-		'epstein-docs-fulltext',
-		'house-oversight-gdrive'
-	];
-
-	const availableDocTypes = [
-		'Court Filing',
-		'Legal Document',
-		'Email',
-		'Report',
-		'Testimony',
-		'Photo',
-		'Other'
-	];
-
-	const availableClassifications = [
-		'email',
-		'deposition_transcript',
-		'court_filing',
-		'financial_record',
-		'flight_log',
-		'calendar_entry',
-		'letter_correspondence',
-		'legal_motion',
-		'fbi_report',
-		'photograph',
-		'handwritten_note',
-		'other'
-	];
-
-	// Date range presets
-	const datePresets = [
-		{ label: '1990s', start: '1990-01-01', end: '1999-12-31' },
-		{ label: '2000s', start: '2000-01-01', end: '2009-12-31' },
-		{ label: '2010s', start: '2010-01-01', end: '2019-12-31' },
-		{ label: '2005', start: '2005-01-01', end: '2005-12-31' },
-		{ label: '2006', start: '2006-01-01', end: '2006-12-31' },
-		{ label: '2008', start: '2008-01-01', end: '2008-12-31' },
-		{ label: '2019', start: '2019-01-01', end: '2019-12-31' }
-	];
-
-	let selectedSources = $state<Set<string>>(new Set(sources));
-	let selectedDocTypes = $state<Set<string>>(new Set(docTypes));
-	let selectedClassifications = $state<Set<string>>(new Set(classifications));
-	let startDate = $state(dateRange?.[0] || '');
-	let endDate = $state(dateRange?.[1] || '');
-
-	function toggleSource(source: string) {
-		if (selectedSources.has(source)) {
-			selectedSources.delete(source);
-		} else {
-			selectedSources.add(source);
-		}
-		emitFilters();
+function toggleDocType(type: string) {
+	if (selectedDocTypes.has(type)) {
+		selectedDocTypes.delete(type);
+	} else {
+		selectedDocTypes.add(type);
 	}
+	emitFilters();
+}
 
-	function toggleDocType(type: string) {
-		if (selectedDocTypes.has(type)) {
-			selectedDocTypes.delete(type);
-		} else {
-			selectedDocTypes.add(type);
-		}
-		emitFilters();
+function toggleClassification(classification: string) {
+	if (selectedClassifications.has(classification)) {
+		selectedClassifications.delete(classification);
+	} else {
+		selectedClassifications.add(classification);
 	}
+	emitFilters();
+}
 
-	function toggleClassification(classification: string) {
-		if (selectedClassifications.has(classification)) {
-			selectedClassifications.delete(classification);
-		} else {
-			selectedClassifications.add(classification);
-		}
-		emitFilters();
+function updateDateRange() {
+	emitFilters();
+}
+
+function applyDatePreset(preset: { start: string; end: string }) {
+	startDate = preset.start;
+	endDate = preset.end;
+	emitFilters();
+}
+
+function emitFilters() {
+	onFilterChange({
+		sources: selectedSources.size > 0 ? Array.from(selectedSources) : undefined,
+		docTypes: selectedDocTypes.size > 0 ? Array.from(selectedDocTypes) : undefined,
+		classifications:
+			selectedClassifications.size > 0 ? Array.from(selectedClassifications) : undefined,
+		dateRange: startDate && endDate ? ([startDate, endDate] as [string, string]) : undefined,
+		entityIds: selectedEntities.length > 0 ? selectedEntities.map((e) => e.id) : undefined,
+	});
+}
+
+function clearAll() {
+	selectedSources.clear();
+	selectedDocTypes.clear();
+	selectedClassifications.clear();
+	startDate = "";
+	endDate = "";
+	// Clear entity filters
+	for (const entity of [...selectedEntities]) {
+		onEntityRemove(entity.id);
 	}
+	emitFilters();
+}
 
-	function updateDateRange() {
-		emitFilters();
-	}
-
-	function applyDatePreset(preset: { start: string; end: string }) {
-		startDate = preset.start;
-		endDate = preset.end;
-		emitFilters();
-	}
-
-	function emitFilters() {
-		onFilterChange({
-			sources: selectedSources.size > 0 ? Array.from(selectedSources) : undefined,
-			docTypes: selectedDocTypes.size > 0 ? Array.from(selectedDocTypes) : undefined,
-			classifications: selectedClassifications.size > 0 ? Array.from(selectedClassifications) : undefined,
-			dateRange:
-				startDate && endDate ? ([startDate, endDate] as [string, string]) : undefined,
-			entityIds: selectedEntities.length > 0 ? selectedEntities.map((e) => e.id) : undefined
-		});
-	}
-
-	function clearAll() {
-		selectedSources.clear();
-		selectedDocTypes.clear();
-		selectedClassifications.clear();
-		startDate = '';
-		endDate = '';
-		// Clear entity filters
-		for (const entity of [...selectedEntities]) {
-			onEntityRemove(entity.id);
-		}
-		emitFilters();
-	}
-
-	let hasActiveFilters = $derived(
-		selectedSources.size > 0 ||
+const hasActiveFilters = $derived(
+	selectedSources.size > 0 ||
 		selectedDocTypes.size > 0 ||
 		selectedClassifications.size > 0 ||
 		(startDate && endDate) ||
-		selectedEntities.length > 0
-	);
+		selectedEntities.length > 0,
+);
 </script>
 
 <aside class="w-64 border-r bg-background p-4 overflow-y-auto">

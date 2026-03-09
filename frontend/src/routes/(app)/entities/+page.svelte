@@ -1,78 +1,78 @@
 <script lang="ts">
-	import { Input } from '$lib/components/ui/input';
-	import * as Card from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
-	import * as Tabs from '$lib/components/ui/tabs';
-	import { Button } from '$lib/components/ui/button';
-	import { entityColor } from '$lib/utils';
-	import type { Entity } from '$lib/types';
-	import type { PageData } from './$types';
+import { Badge } from "$lib/components/ui/badge";
+import { Button } from "$lib/components/ui/button";
+import * as Card from "$lib/components/ui/card";
+import { Input } from "$lib/components/ui/input";
+import * as Tabs from "$lib/components/ui/tabs";
+import type { Entity } from "$lib/types";
+import { entityColor } from "$lib/utils";
+import type { PageData } from "./$types";
 
-	let { data }: { data: PageData } = $props();
+const { data }: { data: PageData } = $props();
 
-	let searchQuery = $state('');
-	let activeType = $state<string>('All');
-	let entities = $state<Entity[]>(data.entities);
-	let loading = $state(false);
-	let page = $state(0);
+let searchQuery = $state("");
+let activeType = $state<string>("All");
+let entities = $state<Entity[]>(data.entities);
+let loading = $state(false);
+let page = $state(0);
 
-	async function loadEntities(search?: string, type?: string) {
-		loading = true;
-		try {
-			const response = await fetch('/api/entities', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					action: search ? 'search' : 'list',
-					query: search,
-					type: type || undefined,
-					offset: page * 50,
-					limit: 50
-				})
-			});
+async function loadEntities(search?: string, type?: string) {
+	loading = true;
+	try {
+		const response = await fetch("/api/entities", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				action: search ? "search" : "list",
+				query: search,
+				type: type || undefined,
+				offset: page * 50,
+				limit: 50,
+			}),
+		});
 
-			const result = await response.json();
-			entities = result.entities || [];
-		} catch (error) {
-			console.error('Failed to load entities:', error);
-			entities = [];
-		} finally {
-			loading = false;
-		}
+		const result = await response.json();
+		entities = result.entities || [];
+	} catch (error) {
+		console.error("Failed to load entities:", error);
+		entities = [];
+	} finally {
+		loading = false;
 	}
+}
 
-	let searchTimeout: number | undefined;
-	function handleSearch(event: Event) {
-		const target = event.target as HTMLInputElement;
-		searchQuery = target.value;
+let searchTimeout: number | undefined;
+function handleSearch(event: Event) {
+	const target = event.target as HTMLInputElement;
+	searchQuery = target.value;
 
-		// Debounce search
-		clearTimeout(searchTimeout);
-		searchTimeout = window.setTimeout(() => {
-			page = 0;
-			loadEntities(searchQuery || undefined, activeType !== 'All' ? activeType : undefined);
-		}, 300);
-	}
-
-	function handleTypeChange(value: string) {
-		activeType = value;
+	// Debounce search
+	clearTimeout(searchTimeout);
+	searchTimeout = window.setTimeout(() => {
 		page = 0;
-		loadEntities(searchQuery || undefined, activeType !== 'All' ? activeType : undefined);
-	}
+		loadEntities(searchQuery || undefined, activeType !== "All" ? activeType : undefined);
+	}, 300);
+}
 
-	function handlePrevPage() {
-		if (page > 0) {
-			page--;
-			loadEntities(searchQuery || undefined, activeType !== 'All' ? activeType : undefined);
-		}
-	}
+function handleTypeChange(value: string) {
+	activeType = value;
+	page = 0;
+	loadEntities(searchQuery || undefined, activeType !== "All" ? activeType : undefined);
+}
 
-	function handleNextPage() {
-		page++;
-		loadEntities(searchQuery || undefined, activeType !== 'All' ? activeType : undefined);
+function handlePrevPage() {
+	if (page > 0) {
+		page--;
+		loadEntities(searchQuery || undefined, activeType !== "All" ? activeType : undefined);
 	}
+}
 
-	const displayEntities = $derived(entities);
+function handleNextPage() {
+	page++;
+	loadEntities(searchQuery || undefined, activeType !== "All" ? activeType : undefined);
+}
+
+const displayEntities = $derived(entities);
 </script>
 
 <div class="container mx-auto p-6 space-y-6">

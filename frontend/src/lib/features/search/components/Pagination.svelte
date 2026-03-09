@@ -1,43 +1,43 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import { ChevronLeft, ChevronRight } from '@lucide/svelte';
+import { Button } from "$lib/components/ui/button";
+import { ChevronLeft, ChevronRight } from "@lucide/svelte";
 
-	interface Props {
-		currentPage: number;
-		totalPages: number;
-		onPageChange: (page: number) => void;
+interface Props {
+	currentPage: number;
+	totalPages: number;
+	onPageChange: (page: number) => void;
+}
+
+const { currentPage, totalPages, onPageChange }: Props = $props();
+
+function getPageNumbers(): (number | "ellipsis")[] {
+	if (totalPages <= 7) {
+		return Array.from({ length: totalPages }, (_, i) => i + 1);
 	}
 
-	let { currentPage, totalPages, onPageChange }: Props = $props();
+	const pages: (number | "ellipsis")[] = [1];
 
-	function getPageNumbers(): (number | 'ellipsis')[] {
-		if (totalPages <= 7) {
-			return Array.from({ length: totalPages }, (_, i) => i + 1);
-		}
-
-		const pages: (number | 'ellipsis')[] = [1];
-
-		if (currentPage > 3) {
-			pages.push('ellipsis');
-		}
-
-		const start = Math.max(2, currentPage - 1);
-		const end = Math.min(totalPages - 1, currentPage + 1);
-
-		for (let i = start; i <= end; i++) {
-			pages.push(i);
-		}
-
-		if (currentPage < totalPages - 2) {
-			pages.push('ellipsis');
-		}
-
-		pages.push(totalPages);
-
-		return pages;
+	if (currentPage > 3) {
+		pages.push("ellipsis");
 	}
 
-	let pageNumbers = $derived(getPageNumbers());
+	const start = Math.max(2, currentPage - 1);
+	const end = Math.min(totalPages - 1, currentPage + 1);
+
+	for (let i = start; i <= end; i++) {
+		pages.push(i);
+	}
+
+	if (currentPage < totalPages - 2) {
+		pages.push("ellipsis");
+	}
+
+	pages.push(totalPages);
+
+	return pages;
+}
+
+const pageNumbers = $derived(getPageNumbers());
 </script>
 
 {#if totalPages > 1}

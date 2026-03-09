@@ -49,19 +49,13 @@ export function validateNodeLabels(labels: string[]): string[] {
  * Clamps depth to 1-4. Validates relationship types against allowlist.
  * No user input is ever string-interpolated into the Cypher query.
  */
-export function buildTraversalQuery(
-	relationshipTypes: string[],
-	maxDepth: number,
-): CypherQuery {
+export function buildTraversalQuery(relationshipTypes: string[], maxDepth: number): CypherQuery {
 	const clampedDepth = Math.max(1, Math.min(4, Math.floor(maxDepth)));
 	const validTypes = validateRelationshipTypes(relationshipTypes);
 
 	// Build relationship type filter using allowlisted types only (safe since they come from our Set)
 	// These are NOT user input - they've been validated against the allowlist
-	const relTypeFilter =
-		validTypes.length > 0
-			? `[:${validTypes.join("|")}]`
-			: ""; // empty means any relationship type
+	const relTypeFilter = validTypes.length > 0 ? `[:${validTypes.join("|")}]` : ""; // empty means any relationship type
 
 	const query = `MATCH path = (start)-${relTypeFilter}*1..${clampedDepth}-(end)
 WHERE start.name = $startNode

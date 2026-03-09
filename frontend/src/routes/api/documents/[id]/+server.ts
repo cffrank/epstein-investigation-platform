@@ -1,11 +1,11 @@
-import { json } from '@sveltejs/kit';
-import { queryOne } from '$lib/server/db';
-import { neo4jClient } from '$lib/server/neo4j';
-import type { RequestHandler } from './$types';
+import { queryOne } from "$lib/server/db";
+import { neo4jClient } from "$lib/server/neo4j";
+import { json } from "@sveltejs/kit";
+import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = async ({ params, platform }) => {
 	if (!platform) {
-		return json({ error: 'Platform not available' }, { status: 500 });
+		return json({ error: "Platform not available" }, { status: 500 });
 	}
 
 	try {
@@ -31,11 +31,11 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 				content_hash,
 				created_at
 			FROM documents WHERE id = $1`,
-			[params.id]
+			[params.id],
 		);
 
 		if (!doc) {
-			return json({ error: 'Document not found' }, { status: 404 });
+			return json({ error: "Document not found" }, { status: 404 });
 		}
 
 		const neo4j = neo4jClient(platform);
@@ -43,13 +43,13 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 			`MATCH (d:Document {doc_id: $docId})-[:MENTIONS]->(e)
 			 RETURN id(e) as id, e.name as name, labels(e)[0] as type
 			 LIMIT 100`,
-			{ docId: params.id }
+			{ docId: params.id },
 		);
 
 		const entities = entityResult.rows.map((row) => ({
 			id: String(row[0]),
 			name: String(row[1]),
-			type: String(row[2])
+			type: String(row[2]),
 		}));
 
 		return json({
@@ -61,14 +61,14 @@ export const GET: RequestHandler = async ({ params, platform }) => {
 				file_size_bytes: doc.file_size_bytes,
 				r2_key: doc.r2_key,
 				text: doc.text || doc.extracted_text || null,
-				page_count: doc.page_count ? parseInt(doc.page_count, 10) : null,
+				page_count: doc.page_count ? Number.parseInt(doc.page_count, 10) : null,
 				content_hash: doc.content_hash,
-				created_at: doc.created_at
+				created_at: doc.created_at,
 			},
-			entities
+			entities,
 		});
 	} catch (error) {
-		console.error('Error fetching document:', error);
-		return json({ error: 'Failed to fetch document' }, { status: 500 });
+		console.error("Error fetching document:", error);
+		return json({ error: "Failed to fetch document" }, { status: 500 });
 	}
 };

@@ -1,14 +1,14 @@
-import { error } from '@sveltejs/kit';
-import { queryOne } from '$lib/server/db';
-import { neo4jClient } from '$lib/server/neo4j';
-import type { PageServerLoad } from './$types';
+import { queryOne } from "$lib/server/db";
+import { neo4jClient } from "$lib/server/neo4j";
+import { error } from "@sveltejs/kit";
+import type { PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ params, platform }) => {
 	if (!platform?.env) {
 		return {
 			document: null,
 			entities: [],
-			error: 'Platform not available'
+			error: "Platform not available",
 		};
 	}
 
@@ -35,11 +35,11 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 				content_hash,
 				created_at
 			FROM documents WHERE id = $1`,
-			[params.id]
+			[params.id],
 		);
 
 		if (!doc) {
-			error(404, { message: 'Document not found' });
+			error(404, { message: "Document not found" });
 		}
 
 		let entities: Array<{ id: string; name: string; type: string }> = [];
@@ -49,15 +49,15 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 				`MATCH (d:Document {doc_id: $docId})-[:MENTIONS]->(e)
 				 RETURN id(e) as id, e.name as name, labels(e)[0] as type
 				 LIMIT 100`,
-				{ docId: params.id }
+				{ docId: params.id },
 			);
 			entities = entityResult.rows.map((row) => ({
 				id: String(row[0]),
 				name: String(row[1]),
-				type: String(row[2])
+				type: String(row[2]),
 			}));
 		} catch (e) {
-			console.error('Neo4j entity fetch failed:', e);
+			console.error("Neo4j entity fetch failed:", e);
 		}
 
 		return {
@@ -69,15 +69,15 @@ export const load: PageServerLoad = async ({ params, platform }) => {
 				file_size_bytes: doc.file_size_bytes,
 				r2_key: doc.r2_key,
 				text: doc.text || doc.extracted_text || null,
-				page_count: doc.page_count ? parseInt(doc.page_count, 10) : null,
+				page_count: doc.page_count ? Number.parseInt(doc.page_count, 10) : null,
 				content_hash: doc.content_hash,
-				created_at: doc.created_at
+				created_at: doc.created_at,
 			},
-			entities
+			entities,
 		};
 	} catch (e) {
-		if (e && typeof e === 'object' && 'status' in e) throw e; // re-throw SvelteKit errors
-		console.error('Document page load error:', e);
+		if (e && typeof e === "object" && "status" in e) throw e; // re-throw SvelteKit errors
+		console.error("Document page load error:", e);
 		error(500, { message: String(e) });
 	}
 };

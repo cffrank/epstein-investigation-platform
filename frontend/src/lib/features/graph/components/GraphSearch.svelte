@@ -1,39 +1,39 @@
 <script lang="ts">
-	import { Search } from '@lucide/svelte';
+import { Search } from "@lucide/svelte";
 
-	let {
-		onSearch,
-		loading = false
-	}: {
-		onSearch: (query: string) => void;
-		loading?: boolean;
-	} = $props();
+const {
+	onSearch,
+	loading = false,
+}: {
+	onSearch: (query: string) => void;
+	loading?: boolean;
+} = $props();
 
-	let query = $state('');
-	let searchResults = $state<
-		Array<{ id: string; label: string; type: string; connections: number }>
-	>([]);
-	let showResults = $state(false);
+const query = $state("");
+const searchResults = $state<
+	Array<{ id: string; label: string; type: string; connections: number }>
+>([]);
+let showResults = $state(false);
 
-	function handleKeyDown(e: KeyboardEvent) {
-		if (e.key === 'Enter' && query.trim()) {
-			onSearch(query.trim());
-			showResults = false;
-		}
+function handleKeyDown(e: KeyboardEvent) {
+	if (e.key === "Enter" && query.trim()) {
+		onSearch(query.trim());
+		showResults = false;
 	}
+}
 
-	function handleFocus() {
-		if (searchResults.length > 0) {
-			showResults = true;
-		}
+function handleFocus() {
+	if (searchResults.length > 0) {
+		showResults = true;
 	}
+}
 
-	function handleBlur() {
-		// Delay to allow click on results
-		setTimeout(() => {
-			showResults = false;
-		}, 200);
-	}
+function handleBlur() {
+	// Delay to allow click on results
+	setTimeout(() => {
+		showResults = false;
+	}, 200);
+}
 </script>
 
 <div class="absolute left-4 top-4 z-10 w-96">

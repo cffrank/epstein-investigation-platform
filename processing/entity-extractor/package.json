@@ -1,12 +1,12 @@
 {
-  "name": "entity-extractor",
-  "version": "1.0.0",
-  "description": "Extract entities from documents and store in Neo4j",
-  "main": "extract.js",
-  "type": "module",
-  "dependencies": {
-    "compromise": "^14.11.0",
-    "neo4j-driver": "^5.17.0",
-    "pg": "^8.11.3"
-  }
+	"name": "entity-extractor",
+	"version": "1.0.0",
+	"description": "Extract entities from documents and store in Neo4j",
+	"main": "extract.js",
+	"type": "module",
+	"dependencies": {
+		"compromise": "^14.11.0",
+		"neo4j-driver": "^5.17.0",
+		"pg": "^8.11.3"
+	}
 }

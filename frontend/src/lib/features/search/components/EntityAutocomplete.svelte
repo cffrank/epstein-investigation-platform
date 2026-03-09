@@ -1,77 +1,77 @@
 <script lang="ts">
-	import type { EntityRef } from '$lib/types';
-	import { Input } from '$lib/components/ui/input';
-	import { Badge } from '$lib/components/ui/badge';
-	import { X } from '@lucide/svelte';
-	import { entityColor } from '$lib/utils';
+import { Badge } from "$lib/components/ui/badge";
+import { Input } from "$lib/components/ui/input";
+import type { EntityRef } from "$lib/types";
+import { entityColor } from "$lib/utils";
+import { X } from "@lucide/svelte";
 
-	interface Props {
-		selectedEntities: EntityRef[];
-		onAdd: (entity: EntityRef) => void;
-		onRemove: (entityId: string) => void;
-	}
+interface Props {
+	selectedEntities: EntityRef[];
+	onAdd: (entity: EntityRef) => void;
+	onRemove: (entityId: string) => void;
+}
 
-	let { selectedEntities, onAdd, onRemove }: Props = $props();
+const { selectedEntities, onAdd, onRemove }: Props = $props();
 
-	let inputValue = $state('');
-	let suggestions = $state<EntityRef[]>([]);
-	let showDropdown = $state(false);
-	let loading = $state(false);
-	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-	let containerEl: HTMLDivElement | undefined = $state();
+let inputValue = $state("");
+let suggestions = $state<EntityRef[]>([]);
+let showDropdown = $state(false);
+let loading = $state(false);
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+const containerEl: HTMLDivElement | undefined = $state();
 
-	function handleInput(event: Event) {
-		const target = event.target as HTMLInputElement;
-		inputValue = target.value;
+function handleInput(event: Event) {
+	const target = event.target as HTMLInputElement;
+	inputValue = target.value;
 
-		if (debounceTimer) clearTimeout(debounceTimer);
+	if (debounceTimer) clearTimeout(debounceTimer);
 
-		if (!inputValue.trim()) {
-			suggestions = [];
-			showDropdown = false;
-			return;
-		}
-
-		debounceTimer = setTimeout(() => {
-			fetchSuggestions(inputValue.trim());
-		}, 300);
-	}
-
-	async function fetchSuggestions(term: string) {
-		loading = true;
-		try {
-			const response = await fetch(`/api/entities/autocomplete?q=${encodeURIComponent(term)}`);
-			if (!response.ok) throw new Error('Failed to fetch');
-			const data = (await response.json()) as EntityRef[];
-			// Filter out already-selected entities
-			const selectedIds = new Set(selectedEntities.map((e) => e.id));
-			suggestions = data.filter((e) => !selectedIds.has(e.id));
-			showDropdown = suggestions.length > 0;
-		} catch {
-			suggestions = [];
-			showDropdown = false;
-		} finally {
-			loading = false;
-		}
-	}
-
-	function selectEntity(entity: EntityRef) {
-		onAdd(entity);
-		inputValue = '';
+	if (!inputValue.trim()) {
 		suggestions = [];
 		showDropdown = false;
+		return;
 	}
 
-	function handleClickOutside(event: MouseEvent) {
-		if (containerEl && !containerEl.contains(event.target as Node)) {
-			showDropdown = false;
-		}
-	}
+	debounceTimer = setTimeout(() => {
+		fetchSuggestions(inputValue.trim());
+	}, 300);
+}
 
-	function badgeStyle(type: string): string {
-		const color = entityColor(type);
-		return `border-color: ${color}; color: ${color}`;
+async function fetchSuggestions(term: string) {
+	loading = true;
+	try {
+		const response = await fetch(`/api/entities/autocomplete?q=${encodeURIComponent(term)}`);
+		if (!response.ok) throw new Error("Failed to fetch");
+		const data = (await response.json()) as EntityRef[];
+		// Filter out already-selected entities
+		const selectedIds = new Set(selectedEntities.map((e) => e.id));
+		suggestions = data.filter((e) => !selectedIds.has(e.id));
+		showDropdown = suggestions.length > 0;
+	} catch {
+		suggestions = [];
+		showDropdown = false;
+	} finally {
+		loading = false;
 	}
+}
+
+function selectEntity(entity: EntityRef) {
+	onAdd(entity);
+	inputValue = "";
+	suggestions = [];
+	showDropdown = false;
+}
+
+function handleClickOutside(event: MouseEvent) {
+	if (containerEl && !containerEl.contains(event.target as Node)) {
+		showDropdown = false;
+	}
+}
+
+function badgeStyle(type: string): string {
+	const color = entityColor(type);
+	return `border-color: ${color}; color: ${color}`;
+}
 </script>
 
 <svelte:window onclick={handleClickOutside} />

@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { Dialog as SheetPrimitive } from "bits-ui";
-	import { cn } from "$lib/utils";
+import { cn } from "$lib/utils";
+import type { Dialog as SheetPrimitive } from "bits-ui";
 
-	let {
-		ref = $bindable(null),
-		class: className,
-		...restProps
-	}: SheetPrimitive.OverlayProps = $props();
+const {
+	ref = $bindable(null),
+	class: className,
+	...restProps
+}: SheetPrimitive.OverlayProps = $props();
 </script>
 
 <SheetPrimitive.Overlay

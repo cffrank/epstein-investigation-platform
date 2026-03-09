@@ -1,52 +1,52 @@
 <script lang="ts">
-	import type { SavedSearch } from '$lib/types';
-	import { loadSavedSearches, deleteSavedSearch } from '$lib/features/search/saved-searches';
-	import { X } from '@lucide/svelte';
-	import { onMount } from 'svelte';
+import { deleteSavedSearch, loadSavedSearches } from "$lib/features/search/saved-searches";
+import type { SavedSearch } from "$lib/types";
+import { X } from "@lucide/svelte";
+import { onMount } from "svelte";
 
-	interface Props {
-		onLoad: (saved: SavedSearch) => void;
-		refreshKey?: number;
-	}
+interface Props {
+	onLoad: (saved: SavedSearch) => void;
+	refreshKey?: number;
+}
 
-	let { onLoad, refreshKey = 0 }: Props = $props();
+const { onLoad, refreshKey = 0 }: Props = $props();
 
-	let searches = $state<SavedSearch[]>([]);
+let searches = $state<SavedSearch[]>([]);
 
-	onMount(() => {
-		searches = loadSavedSearches();
-	});
+onMount(() => {
+	searches = loadSavedSearches();
+});
 
-	// Re-load when refreshKey changes (triggered after saving a new search)
-	$effect(() => {
-		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
-		refreshKey;
-		searches = loadSavedSearches();
-	});
+// Re-load when refreshKey changes (triggered after saving a new search)
+$effect(() => {
+	// eslint-disable-next-line @typescript-eslint/no-unused-expressions
+	refreshKey;
+	searches = loadSavedSearches();
+});
 
-	function handleDelete(id: string, event: MouseEvent) {
-		event.stopPropagation();
-		searches = deleteSavedSearch(id);
-	}
+function handleDelete(id: string, event: MouseEvent) {
+	event.stopPropagation();
+	searches = deleteSavedSearch(id);
+}
 
-	function handleLoad(saved: SavedSearch) {
-		onLoad(saved);
-	}
+function handleLoad(saved: SavedSearch) {
+	onLoad(saved);
+}
 
-	function formatRelativeDate(dateStr: string): string {
-		const date = new Date(dateStr);
-		const now = new Date();
-		const diffMs = now.getTime() - date.getTime();
-		const diffMins = Math.floor(diffMs / 60000);
-		const diffHours = Math.floor(diffMs / 3600000);
-		const diffDays = Math.floor(diffMs / 86400000);
+function formatRelativeDate(dateStr: string): string {
+	const date = new Date(dateStr);
+	const now = new Date();
+	const diffMs = now.getTime() - date.getTime();
+	const diffMins = Math.floor(diffMs / 60000);
+	const diffHours = Math.floor(diffMs / 3600000);
+	const diffDays = Math.floor(diffMs / 86400000);
 
-		if (diffMins < 1) return 'just now';
-		if (diffMins < 60) return `${diffMins}m ago`;
-		if (diffHours < 24) return `${diffHours}h ago`;
-		if (diffDays < 30) return `${diffDays}d ago`;
-		return date.toLocaleDateString();
-	}
+	if (diffMins < 1) return "just now";
+	if (diffMins < 60) return `${diffMins}m ago`;
+	if (diffHours < 24) return `${diffHours}h ago`;
+	if (diffDays < 30) return `${diffDays}d ago`;
+	return date.toLocaleDateString();
+}
 </script>
 
 <div class="space-y-1">

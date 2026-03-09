@@ -1,24 +1,24 @@
 <script lang="ts">
-	import { page } from '$app/state';
-	import { Search, MessageCircle, GitBranch, Users, FileText, Command } from '@lucide/svelte';
+import { page } from "$app/state";
+import { Command, FileText, GitBranch, MessageCircle, Search, Users } from "@lucide/svelte";
 
-	interface Props {
-		collapsed?: boolean;
-		onToggle?: () => void;
-	}
+interface Props {
+	collapsed?: boolean;
+	onToggle?: () => void;
+}
 
-	let { collapsed = false, onToggle }: Props = $props();
+const { collapsed = false, onToggle }: Props = $props();
 
-	const navItems = [
-		{ href: '/search', label: 'Search', icon: Search },
-		{ href: '/chat', label: 'AI Chat', icon: MessageCircle },
-		{ href: '/graph', label: 'Graph', icon: GitBranch },
-		{ href: '/entities', label: 'Entities', icon: Users }
-	];
+const navItems = [
+	{ href: "/search", label: "Search", icon: Search },
+	{ href: "/chat", label: "AI Chat", icon: MessageCircle },
+	{ href: "/graph", label: "Graph", icon: GitBranch },
+	{ href: "/entities", label: "Entities", icon: Users },
+];
 
-	function isActive(href: string): boolean {
-		return page.url.pathname.startsWith(href);
-	}
+function isActive(href: string): boolean {
+	return page.url.pathname.startsWith(href);
+}
 </script>
 
 <aside

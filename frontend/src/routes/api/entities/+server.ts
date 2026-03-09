@@ -1,10 +1,10 @@
-import { json } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
-import { neo4jClient } from '$lib/server/neo4j';
-import type { Entity, EntityType } from '$lib/types';
+import { neo4jClient } from "$lib/server/neo4j";
+import type { Entity, EntityType } from "$lib/types";
+import { json } from "@sveltejs/kit";
+import type { RequestHandler } from "./$types";
 
 interface EntityListRequest {
-	action: 'list' | 'search';
+	action: "list" | "search";
 	query?: string;
 	type?: EntityType;
 	offset?: number;
@@ -13,7 +13,7 @@ interface EntityListRequest {
 
 export const POST: RequestHandler = async ({ request, platform }) => {
 	if (!platform?.env) {
-		return json({ error: 'Platform unavailable in dev mode' }, { status: 500 });
+		return json({ error: "Platform unavailable in dev mode" }, { status: 500 });
 	}
 
 	try {
@@ -24,7 +24,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		let cypher: string;
 		let params: Record<string, unknown>;
 
-		if (action === 'search' && query) {
+		if (action === "search" && query) {
 			// Search entities by name
 			cypher = `
 				MATCH (n)
@@ -37,11 +37,11 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 				LIMIT $limit
 			`;
 			params = { query, offset, limit };
-		} else if (action === 'list' && type) {
+		} else if (action === "list" && type) {
 			// List entities of a specific type
 			// Validate type to prevent injection
-			if (!['Person', 'Organization', 'Location'].includes(type)) {
-				return json({ error: 'Invalid entity type' }, { status: 400 });
+			if (!["Person", "Organization", "Location"].includes(type)) {
+				return json({ error: "Invalid entity type" }, { status: 400 });
 			}
 
 			cypher = `
@@ -75,12 +75,12 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 			type: row[2] as EntityType,
 			connections: row[3] as number,
 			document_count: 0,
-			properties: {}
+			properties: {},
 		}));
 
 		return json({ entities });
 	} catch (error) {
-		console.error('Entity list error:', error);
+		console.error("Entity list error:", error);
 		return json({ error: String(error) }, { status: 500 });
 	}
 };

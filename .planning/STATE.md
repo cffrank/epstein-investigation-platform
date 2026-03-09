@@ -65,5 +65,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-08
-Stopped at: Phase 3 complete, ready for Phase 4
-Resume file: .planning/ROADMAP.md
+Stopped at: Phase 4 context gathered, ready for plan-phase
+Resume file: .planning/phases/04-faceted-search-and-export/04-CONTEXT.md

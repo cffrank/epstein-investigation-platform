@@ -90,12 +90,38 @@ export interface GraphData {
 	edges: GraphEdge[];
 }
 
+// Tool call tracking for UI
+export interface ToolCall {
+	id: string;
+	name: string;
+	input?: Record<string, unknown>;
+	status: 'running' | 'complete' | 'error';
+	resultCount?: number;
+	error?: string;
+}
+
+// Native citation from Anthropic API
+export interface NativeCitation {
+	type: 'char_location' | 'page_location' | 'content_block_location';
+	cited_text: string;
+	document_index: number;
+	document_title: string;
+	source: string;
+	start_char_index?: number;
+	end_char_index?: number;
+}
+
+// Model selection keys
+export type ModelKey = 'haiku-4.5' | 'sonnet-4.6' | 'opus-4.6';
+
 export interface ChatMessage {
 	role: 'user' | 'assistant';
 	content: string;
-	citations?: Citation[];
+	citations?: NativeCitation[];
+	toolCalls?: ToolCall[];
 }
 
+// Legacy citation type for backward compatibility
 export interface Citation {
 	index: number;
 	document_id: string;

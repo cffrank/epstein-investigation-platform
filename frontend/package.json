@@ -30,6 +30,7 @@
 		"vitest": "^3.2.4"
 	},
 	"dependencies": {
+		"@anthropic-ai/sdk": "^0.78.0",
 		"@internationalized/date": "^3.11.0",
 		"@lucide/svelte": "^0.564.0",
 		"bits-ui": "^2.15.5",

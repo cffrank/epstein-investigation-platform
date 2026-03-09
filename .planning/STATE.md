@@ -5,32 +5,32 @@
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** An investigator can search, connect, and analyze 1.5M documents to discover relationships and patterns impossible to find manually.
-**Current focus:** Phase 3 -- Entity Dossier Pages
+**Current focus:** Phase 4 -- Faceted Search and Export
 
 ## Current Position
 
-Phase: 2 of 7 (AI Chat with Tool Use)
+Phase: 3 of 7 (Entity Dossier Pages)
 Plan: 4 of 4 in current phase
 Status: Phase Complete
-Last activity: 2026-03-08 -- Phase 2 complete (all 4 plans executed)
+Last activity: 2026-03-08 -- Phase 3 complete (all 4 plans executed)
 
-Progress: [██████████████████] 29%
+Progress: [████████████████████████] 43%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
+- Total plans completed: 4 (Phase 3)
 - Average duration: -
-- Total execution time: 0 hours
+- Total execution time: -
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 3 | 4 | - | - |
 
 **Recent Trend:**
-- Last 5 plans: none
+- Last 5 plans: 03-01, 03-02, 03-03, 03-04
 - Trend: N/A
 
 *Updated after each plan completion*
@@ -47,6 +47,9 @@ Recent decisions affecting current work:
 - Foundation-only test infrastructure (vitest + critical paths, not full coverage)
 - AI Gateway mandatory for all Anthropic API calls
 - Claude model configurable (default Sonnet 4.6, option for Opus)
+- Entity notes stored in entity_notes table (not investigation_notes which has different schema)
+- Biography cached in entities.biography column with biography_generated_at timestamp
+- Neo4j internal IDs used as entity references in entity_notes.entity_id (text column, not FK)
 
 ### Pending Todos
 
@@ -57,9 +60,10 @@ None yet.
 - Neo4j GDS memory behavior untested at 88K nodes / 917K edges (Phase 5 concern)
 - Cloudflare Pages SSE buffering with Anthropic SDK unvalidated (monitor in production)
 - Connection pool at ~90/100 -- tool use adds bursty queries (monitor in production)
+- Timeline tab mostly empty until Phase 6 date extraction pipeline runs
 
 ## Session Continuity
 
 Last session: 2026-03-08
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-entity-dossier-pages/03-CONTEXT.md
+Stopped at: Phase 3 complete, ready for Phase 4
+Resume file: .planning/ROADMAP.md

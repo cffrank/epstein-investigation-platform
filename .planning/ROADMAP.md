@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Security and Foundation** - Close critical vulnerabilities, fix performance bottlenecks, establish test infrastructure and CI
 - [x] **Phase 2: AI Chat with Tool Use** - Replace OpenAI chat with Claude-powered investigation assistant that queries all three databases
-- [ ] **Phase 3: Entity Dossier Pages** - Rich entity profiles with documents, connections, timeline, AI biography, and analyst notes
+- [x] **Phase 3: Entity Dossier Pages** - Rich entity profiles with documents, connections, timeline, AI biography, and analyst notes
 - [ ] **Phase 4: Faceted Search and Export** - Content type filters, entity mention filters, date range presets, saved searches, and result export
 - [ ] **Phase 5: Graph Analysis** - PageRank, community detection, bridge nodes, hidden connections, and visual algorithm overlays
 - [ ] **Phase 6: Timeline Visualization** - Date extraction pipeline and interactive zoomable timeline with entity filtering
@@ -70,10 +70,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 03-01-PLAN.md -- Types, server data loading, dossier header component (ENTY-01)
-- [ ] 03-02-PLAN.md -- Notes CRUD: DB migration, API endpoint, NotesTab + NoteEditor (ENTY-06)
-- [ ] 03-03-PLAN.md -- DocumentsTab (search/filter), ConnectionsTab (merged), TimelineTab (ENTY-02, ENTY-03, ENTY-04)
-- [ ] 03-04-PLAN.md -- Biography SSE endpoint + BiographyTab + 5-tab page assembly + chat pre-fill (ENTY-05)
+- [x] 03-01-PLAN.md -- Types, server data loading, dossier header component (ENTY-01)
+- [x] 03-02-PLAN.md -- Notes CRUD: DB migration, API endpoint, NotesTab + NoteEditor (ENTY-06)
+- [x] 03-03-PLAN.md -- DocumentsTab (search/filter), ConnectionsTab (merged), TimelineTab (ENTY-02, ENTY-03, ENTY-04)
+- [x] 03-04-PLAN.md -- Biography SSE endpoint + BiographyTab + 5-tab page assembly + chat pre-fill (ENTY-05)
 
 ### Phase 4: Faceted Search and Export
 **Goal**: An investigator can narrow search results using content type, entity, and date filters -- and save searches or export results for offline analysis
@@ -140,7 +140,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 |-------|----------------|--------|-----------|
 | 1. Security and Foundation | 4/4 | Complete | 2026-03-07 |
 | 2. AI Chat with Tool Use | 4/4 | Complete | 2026-03-08 |
-| 3. Entity Dossier Pages | 0/4 | Planned | - |
+| 3. Entity Dossier Pages | 4/4 | Complete | 2026-03-08 |
 | 4. Faceted Search and Export | 0/1 | Not started | - |
 | 5. Graph Analysis | 0/2 | Not started | - |
 | 6. Timeline Visualization | 0/1 | Not started | - |

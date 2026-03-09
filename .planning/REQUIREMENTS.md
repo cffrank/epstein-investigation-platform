@@ -63,7 +63,7 @@ Requirements for Phase 2 (Intelligence Layer). Each maps to roadmap phases.
 - [x] **GRPH-02**: User can run Louvain community detection to identify entity clusters
 - [x] **GRPH-03**: User can run betweenness centrality to identify bridge nodes between communities
 - [x] **GRPH-04**: User can discover hidden connections — entity pairs with shared neighbors but no direct edge
-- [ ] **GRPH-05**: Graph visualization reflects algorithm results via node size (centrality) and color (community)
+- [x] **GRPH-05**: Graph visualization reflects algorithm results via node size (centrality) and color (community)
 
 ### Timeline
 
@@ -169,7 +169,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GRPH-02 | Phase 5 | Complete |
 | GRPH-03 | Phase 5 | Complete |
 | GRPH-04 | Phase 5 | Complete |
-| GRPH-05 | Phase 5 | Pending |
+| GRPH-05 | Phase 5 | Complete |
 | TIME-01 | Phase 6 | Pending |
 | TIME-02 | Phase 6 | Pending |
 | TIME-03 | Phase 6 | Pending |

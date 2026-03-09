@@ -13,7 +13,7 @@ Transform the platform from a document search tool into an investigative intelli
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Security and Foundation** - Close critical vulnerabilities, fix performance bottlenecks, establish test infrastructure and CI
-- [ ] **Phase 2: AI Chat with Tool Use** - Replace OpenAI chat with Claude-powered investigation assistant that queries all three databases
+- [x] **Phase 2: AI Chat with Tool Use** - Replace OpenAI chat with Claude-powered investigation assistant that queries all three databases
 - [ ] **Phase 3: Entity Dossier Pages** - Rich entity profiles with documents, connections, timeline, AI biography, and analyst notes
 - [ ] **Phase 4: Faceted Search and Export** - Content type filters, entity mention filters, date range presets, saved searches, and result export
 - [ ] **Phase 5: Graph Analysis** - PageRank, community detection, bridge nodes, hidden connections, and visual algorithm overlays
@@ -50,11 +50,13 @@ Plans:
   3. Claude autonomously calls search_documents, semantic_search, get_entity_profile, graph_query, and find_connections tools during conversation -- user sees tool use indicators in the stream
   4. Every factual claim in Claude's responses includes clickable document ID citations that open the document viewer
   5. Chat context stays bounded (sliding window of last 6 messages + current turn tools) and AI-generated content displays a disclaimer
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [x] 02-01-PLAN.md -- Anthropic SDK + Cloudflare AI Gateway client + 5 investigation tools with search_result blocks
+- [x] 02-02-PLAN.md -- Chat API rewrite with Anthropic SDK streaming tool loop (max 5 iterations)
+- [x] 02-03-PLAN.md -- Frontend chat UI: tool panels, native citations, model selector, AI disclaimers
+- [x] 02-04-PLAN.md -- SSE parser tests for new event types + verification checkpoint
 
 ### Phase 3: Entity Dossier Pages
 **Goal**: An investigator can view a comprehensive profile for any entity -- documents, connections, timeline, AI-generated biography, and their own notes -- in a single tabbed interface
@@ -135,7 +137,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Security and Foundation | 4/4 | Complete | 2026-03-07 |
-| 2. AI Chat with Tool Use | 0/2 | Not started | - |
+| 2. AI Chat with Tool Use | 4/4 | Complete | 2026-03-08 |
 | 3. Entity Dossier Pages | 0/2 | Not started | - |
 | 4. Faceted Search and Export | 0/1 | Not started | - |
 | 5. Graph Analysis | 0/2 | Not started | - |

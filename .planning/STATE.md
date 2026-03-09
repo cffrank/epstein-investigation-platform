@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** An investigator can search, connect, and analyze 1.5M documents to discover relationships and patterns impossible to find manually.
-**Current focus:** Phase 2 -- AI Chat with Tool Use
+**Current focus:** Phase 3 -- Entity Dossier Pages
 
 ## Current Position
 
-Phase: 1 of 7 (Security and Foundation)
+Phase: 2 of 7 (AI Chat with Tool Use)
 Plan: 4 of 4 in current phase
 Status: Phase Complete
-Last activity: 2026-03-07 -- Phase 1 complete (all 4 plans verified)
+Last activity: 2026-03-08 -- Phase 2 complete (all 4 plans executed)
 
-Progress: [██████████] 14%
+Progress: [██████████████████] 29%
 
 ## Performance Metrics
 
@@ -55,11 +55,11 @@ None yet.
 ### Blockers/Concerns
 
 - Neo4j GDS memory behavior untested at 88K nodes / 917K edges (Phase 5 concern)
-- Cloudflare Pages SSE buffering with Anthropic SDK unvalidated (Phase 2 concern)
-- Connection pool at ~90/100 -- tool use adds bursty queries (Phase 2 concern)
+- Cloudflare Pages SSE buffering with Anthropic SDK unvalidated (monitor in production)
+- Connection pool at ~90/100 -- tool use adds bursty queries (monitor in production)
 
 ## Session Continuity
 
 Last session: 2026-03-08
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-ai-chat-with-tool-use/02-CONTEXT.md
+Stopped at: Phase 2 complete, ready for Phase 3
+Resume file: .planning/phases/02-ai-chat-with-tool-use/02-04-SUMMARY.md

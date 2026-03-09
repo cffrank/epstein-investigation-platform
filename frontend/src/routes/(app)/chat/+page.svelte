@@ -3,9 +3,9 @@
 	import ChatMessage from '$lib/features/chat/components/ChatMessage.svelte';
 	import ChatInput from '$lib/features/chat/components/ChatInput.svelte';
 	import CitationPanel from '$lib/features/chat/components/CitationPanel.svelte';
+	import ModelSelector from '$lib/features/chat/components/ModelSelector.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Plus, Loader2 } from '@lucide/svelte';
-	import { onMount } from 'svelte';
 
 	let messagesContainer: HTMLDivElement;
 
@@ -28,6 +28,13 @@
 	function handleClear() {
 		chatStore.clearChat();
 	}
+
+	// Get citations from last assistant message
+	const lastAssistantCitations = $derived(() => {
+		const assistantMessages = chatStore.messages.filter((m) => m.role === 'assistant');
+		const last = assistantMessages[assistantMessages.length - 1];
+		return last?.citations ?? [];
+	});
 </script>
 
 <div class="flex h-[calc(100vh-4rem)] flex-col">
@@ -37,13 +44,20 @@
 			<div>
 				<h1 class="text-2xl font-bold">AI Chat</h1>
 				<p class="text-sm text-muted-foreground">
-					Ask questions about the document corpus with source citations
+					Ask questions about the 960K+ documents in the Epstein investigation corpus
 				</p>
 			</div>
-			<Button variant="outline" onclick={handleClear} disabled={chatStore.isStreaming}>
-				<Plus class="mr-2 size-4" />
-				New conversation
-			</Button>
+			<div class="flex items-center gap-3">
+				<ModelSelector
+					value={chatStore.selectedModel}
+					onchange={(model) => (chatStore.selectedModel = model)}
+					disabled={chatStore.isStreaming}
+				/>
+				<Button variant="outline" onclick={handleClear} disabled={chatStore.isStreaming}>
+					<Plus class="mr-2 size-4" />
+					New conversation
+				</Button>
+			</div>
 		</div>
 	</div>
 
@@ -54,15 +68,15 @@
 				<div class="text-center space-y-3 px-6">
 					<h2 class="text-xl font-semibold">Welcome to AI Chat</h2>
 					<p class="text-muted-foreground max-w-md">
-						Ask questions about the 1.4M+ documents in the Epstein investigation corpus. All
-						responses include source citations.
+						Claude will search documents, query entities, and traverse the knowledge
+						graph. All responses include source citations.
 					</p>
 					<div class="pt-4 space-y-2">
 						<p class="text-sm text-muted-foreground font-medium">Try asking:</p>
 						<div class="space-y-1 text-sm text-muted-foreground">
 							<p>"What documents mention Virginia Giuffre?"</p>
-							<p>"Summarize the allegations in the court filings"</p>
-							<p>"Who are the key people mentioned across the documents?"</p>
+							<p>"Find connections between Jeffrey Epstein and Les Wexner"</p>
+							<p>"Who are the key people mentioned across the flight logs?"</p>
 						</div>
 					</div>
 				</div>
@@ -73,18 +87,23 @@
 					<ChatMessage {message} />
 				{/each}
 				{#if chatStore.isStreaming}
-					<div class="flex gap-3 px-6 py-4">
-						<div class="max-w-[80%] rounded-lg bg-muted px-4 py-3">
-							<Loader2 class="size-4 animate-spin text-muted-foreground" />
+					{@const lastMsg = chatStore.messages[chatStore.messages.length - 1]}
+					{#if lastMsg?.role === 'assistant' && !lastMsg.content && !lastMsg.toolCalls?.length}
+						<div class="flex gap-3 px-6 py-4">
+							<div class="max-w-[80%] rounded-lg bg-muted px-4 py-3">
+								<Loader2 class="size-4 animate-spin text-muted-foreground" />
+							</div>
 						</div>
-					</div>
+					{/if}
 				{/if}
 			</div>
 		{/if}
 	</div>
 
 	<!-- Citations Panel -->
-	<CitationPanel citations={chatStore.citations} />
+	{#if lastAssistantCitations().length > 0}
+		<CitationPanel citations={lastAssistantCitations()} />
+	{/if}
 
 	<!-- Input -->
 	<ChatInput

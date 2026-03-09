@@ -1,16 +1,29 @@
 <script lang="ts">
-	import type { Citation } from '$lib/types';
-	import { Badge } from '$lib/components/ui/badge';
+	import type { NativeCitation } from '$lib/types';
 	import { Card } from '$lib/components/ui/card';
+	import { Badge } from '$lib/components/ui/badge';
 	import { ChevronDown, ChevronUp } from '@lucide/svelte';
-	import { cn } from '$lib/utils';
 
 	interface Props {
-		citations: Citation[];
+		citations: NativeCitation[];
 	}
 
 	let { citations }: Props = $props();
 	let expanded = $state(true);
+
+	// Deduplicate citations by source, keeping first occurrence
+	const uniqueCitations = $derived(() => {
+		const seen = new Set<string>();
+		const result: Array<NativeCitation & { index: number }> = [];
+		let idx = 1;
+		for (const c of citations) {
+			if (!seen.has(c.source)) {
+				seen.add(c.source);
+				result.push({ ...c, index: idx++ });
+			}
+		}
+		return result;
+	});
 </script>
 
 {#if citations.length > 0}
@@ -19,7 +32,7 @@
 			onclick={() => (expanded = !expanded)}
 			class="flex w-full items-center justify-between text-sm font-medium"
 		>
-			<span>Sources ({citations.length})</span>
+			<span>Sources ({uniqueCitations().length})</span>
 			{#if expanded}
 				<ChevronUp class="size-4" />
 			{:else}
@@ -29,10 +42,10 @@
 
 		{#if expanded}
 			<div class="mt-4 space-y-3">
-				{#each citations as citation}
+				{#each uniqueCitations() as citation}
 					<Card class="p-4">
 						<a
-							href="/documents/{citation.document_id}"
+							href={citation.source}
 							class="block hover:bg-accent/50 transition-colors -m-4 p-4 rounded-lg"
 						>
 							<div class="flex items-start gap-3">
@@ -41,17 +54,11 @@
 								</Badge>
 								<div class="min-w-0 flex-1 space-y-1">
 									<div class="font-medium text-sm truncate">
-										{citation.filename}
+										{citation.document_title}
 									</div>
-									<Badge variant="secondary" class="text-xs">
-										{citation.source}
-									</Badge>
 									<p class="text-xs text-muted-foreground line-clamp-2">
-										{citation.excerpt}
+										{citation.cited_text}
 									</p>
-									<div class="text-xs text-muted-foreground">
-										Score: {citation.score.toFixed(3)}
-									</div>
 								</div>
 							</div>
 						</a>

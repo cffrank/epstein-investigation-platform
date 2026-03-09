@@ -8,6 +8,9 @@
 			label: string;
 			type: string;
 			connections?: number;
+			pagerank?: number;
+			communityId?: number;
+			betweenness?: number;
 		};
 	}
 
@@ -17,17 +20,34 @@
 			source: string;
 			target: string;
 			label: string;
+			lineStyle?: string;
 		};
+	}
+
+	const COMMUNITY_PALETTE = [
+		'#3b82f6', '#ef4444', '#22c55e', '#f59e0b',
+		'#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6'
+	];
+
+	function communityColor(communityId: number | undefined | null, sizes: Array<{ communityId: number }>): string {
+		if (communityId == null) return '#71717a';
+		const index = sizes.findIndex(s => s.communityId === communityId);
+		if (index === -1 || index >= 8) return '#71717a';
+		return COMMUNITY_PALETTE[index];
 	}
 
 	let {
 		elements = $bindable([]),
 		onNodeTap,
-		selectedNode = null
+		selectedNode = null,
+		colorMode = 'type',
+		communitySizes = []
 	}: {
 		elements: Array<CytoscapeElement | CytoscapeEdge>;
 		onNodeTap?: (nodeId: string) => void;
 		selectedNode?: string | null;
+		colorMode?: 'type' | 'community';
+		communitySizes?: Array<{ communityId: number; size: number }>;
 	} = $props();
 
 	let container: HTMLDivElement;
@@ -49,6 +69,9 @@
 					selector: 'node',
 					style: {
 						'background-color': (ele: cytoscape.NodeSingular) => {
+							if (colorMode === 'community') {
+								return communityColor(ele.data('communityId'), communitySizes);
+							}
 							const type = ele.data('type');
 							switch (type) {
 								case 'Person':
@@ -70,10 +93,24 @@
 						'text-wrap': 'wrap',
 						'text-max-width': '80px',
 						width: (ele: cytoscape.NodeSingular) => {
+							const pagerank = ele.data('pagerank');
+							if (pagerank != null) {
+								const allPr = cy!.nodes().map((n: cytoscape.NodeSingular) => n.data('pagerank')).filter((v: unknown): v is number => v != null);
+								const maxPr = Math.max(...allPr, 0.001);
+								const normalized = Math.max(0, Math.min(1, pagerank / maxPr));
+								return 20 + normalized * 40;
+							}
 							const connections = ele.data('connections') || ele.degree();
 							return Math.max(20, Math.min(60, 20 + connections * 2));
 						},
 						height: (ele: cytoscape.NodeSingular) => {
+							const pagerank = ele.data('pagerank');
+							if (pagerank != null) {
+								const allPr = cy!.nodes().map((n: cytoscape.NodeSingular) => n.data('pagerank')).filter((v: unknown): v is number => v != null);
+								const maxPr = Math.max(...allPr, 0.001);
+								const normalized = Math.max(0, Math.min(1, pagerank / maxPr));
+								return 20 + normalized * 40;
+							}
 							const connections = ele.data('connections') || ele.degree();
 							return Math.max(20, Math.min(60, 20 + connections * 2));
 						},
@@ -91,6 +128,22 @@
 							}
 						}
 					}
+				},
+				{
+					selector: 'node[betweenness]',
+					style: {
+						'underlay-color': ((ele: cytoscape.NodeSingular) => {
+							const betweenness = ele.data('betweenness');
+							if (betweenness == null) return 'transparent';
+							const allB = cy!.nodes().map((n: cytoscape.NodeSingular) => n.data('betweenness')).filter((v: unknown): v is number => v != null);
+							const maxB = Math.max(...allB, 0.001);
+							const threshold = maxB * 0.7;
+							return betweenness >= threshold ? '#facc15' : 'transparent';
+						}) as any,
+						'underlay-padding': '8px' as any,
+						'underlay-opacity': 0.25 as any,
+						'underlay-shape': 'ellipse' as any
+					} as any
 				},
 				{
 					selector: 'node:selected',
@@ -112,6 +165,17 @@
 						color: '#71717a', // zinc-500
 						'text-rotation': 'autorotate',
 						'text-margin-y': -10
+					}
+				},
+				{
+					selector: 'edge[lineStyle = "dashed"]',
+					style: {
+						'line-style': 'dashed',
+						'line-dash-pattern': [6, 3] as any,
+						'line-color': '#a855f7', // purple-500
+						'target-arrow-color': '#a855f7',
+						'target-arrow-shape': 'none',
+						width: 2
 					}
 				}
 			],
@@ -187,6 +251,14 @@
 				node.select();
 			}
 		}
+	});
+
+	// Re-evaluate styles when colorMode or communitySizes change
+	$effect(() => {
+		if (!cy) return;
+		const _mode = colorMode;
+		const _sizes = communitySizes;
+		cy.style().update();
 	});
 
 	// Expose methods for controls

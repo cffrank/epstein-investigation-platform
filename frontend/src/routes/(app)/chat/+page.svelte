@@ -6,8 +6,17 @@
 	import ModelSelector from '$lib/features/chat/components/ModelSelector.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Plus, Loader2 } from '@lucide/svelte';
+	import { page } from '$app/stores';
 
 	let messagesContainer: HTMLDivElement;
+
+	// Pre-fill chat input from entity dossier page (?entity=NAME)
+	$effect(() => {
+		const entityParam = $page.url.searchParams.get('entity');
+		if (entityParam && !chatStore.messages.length) {
+			chatStore.input = `Tell me about ${entityParam}`;
+		}
+	});
 
 	function scrollToBottom() {
 		if (messagesContainer) {

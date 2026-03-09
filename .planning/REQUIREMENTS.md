@@ -54,7 +54,7 @@ Requirements for Phase 2 (Intelligence Layer). Each maps to roadmap phases.
 - [x] **SRCH-01**: User can filter search results by document content classification (court filing, correspondence, financial, etc.)
 - [x] **SRCH-02**: User can filter search results by entity mentions (select entities to require in results)
 - [x] **SRCH-03**: User can filter search results by date range using presets (year, decade) and custom range
-- [ ] **SRCH-04**: User can save a search query with filters and re-execute it later from a saved searches list
+- [x] **SRCH-04**: User can save a search query with filters and re-execute it later from a saved searches list
 - [x] **SRCH-05**: User can export current search results to CSV or JSON format
 
 ### Graph Analysis
@@ -163,7 +163,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SRCH-01 | Phase 4 | Complete |
 | SRCH-02 | Phase 4 | Complete |
 | SRCH-03 | Phase 4 | Complete |
-| SRCH-04 | Phase 4 | Pending |
+| SRCH-04 | Phase 4 | Complete |
 | SRCH-05 | Phase 4 | Complete |
 | GRPH-01 | Phase 5 | Pending |
 | GRPH-02 | Phase 5 | Pending |

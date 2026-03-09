@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-03-07)
 
 **Core value:** An investigator can search, connect, and analyze 1.5M documents to discover relationships and patterns impossible to find manually.
-**Current focus:** Phase 4 -- Faceted Search and Export
+**Current focus:** Phase 4 complete -- ready for Phase 5
 
 ## Current Position
 
-Phase: 4 of 7 (Faceted Search and Export)
-Plan: 1 of 2 in current phase
-Status: In Progress
-Last activity: 2026-03-09 -- Phase 4 Plan 01 complete (search API backend)
+Phase: 4 of 7 (Faceted Search and Export) -- COMPLETE
+Plan: 2 of 2 in current phase (done)
+Status: Phase Complete
+Last activity: 2026-03-09 -- Phase 4 Plan 02 complete (faceted search UI)
 
-Progress: [██████████████████████████████] 50%
+Progress: [████████████████████████████████] 57%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5 (Phase 3: 4, Phase 4: 1)
+- Total plans completed: 6 (Phase 3: 4, Phase 4: 2)
 - Average duration: ~4min
 - Total execution time: -
 
@@ -28,10 +28,10 @@ Progress: [███████████████████████
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 3 | 4 | - | - |
-| 4 | 1 | 4min | 4min |
+| 4 | 2 | 7min | 3.5min |
 
 **Recent Trend:**
-- Last 5 plans: 03-01, 03-02, 03-03, 03-04, 04-01
+- Last 5 plans: 03-02, 03-03, 03-04, 04-01, 04-02
 - Trend: N/A
 
 *Updated after each plan completion*
@@ -54,6 +54,9 @@ Recent decisions affecting current work:
 - Search functions extracted into shared $lib/server/search.ts module for reuse by export endpoint
 - Entity filtering uses AND logic (HAVING COUNT = N) -- results must mention ALL selected entities
 - Export limits: 5000 fulltext/hybrid, 1000 semantic (Qdrant memory constraints)
+- Reactive refreshKey prop pattern for cross-component state sync in Svelte 5
+- Simple div dropdowns over shadcn DropdownMenu to avoid unnecessary dependency
+- Date range presets include key Epstein case years (2005, 2006, 2008, 2019)
 
 ### Pending Todos
 
@@ -69,5 +72,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-09
-Stopped at: Completed 04-01-PLAN.md (search API backend)
-Resume file: .planning/phases/04-faceted-search-and-export/04-01-SUMMARY.md
+Stopped at: Completed 04-02-PLAN.md (faceted search UI) -- Phase 4 complete
+Resume file: .planning/phases/04-faceted-search-and-export/04-02-SUMMARY.md
